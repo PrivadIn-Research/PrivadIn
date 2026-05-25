@@ -49,7 +49,7 @@ function AppContent() {
   if (!liveUser) return <LoginPage />;
 
   return (
-    <Shell view={view} onViewChange={setView} muted={muted} onToggleMuted={toggleMuted}>
+    <Shell currentUser={liveUser} view={view} onViewChange={setView} muted={muted} onToggleMuted={toggleMuted}>
       {view === "dashboard" ? (
         <DashboardPage user={liveUser} rankedUsers={rankedUsers} userLogs={userLogs} onPlaySound={playFlush} />
       ) : null}

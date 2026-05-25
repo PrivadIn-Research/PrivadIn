@@ -12,10 +12,14 @@ export async function uploadAvatarFile(firebaseUid: string, file: File) {
   return url;
 }
 
-export async function updateUserProfile(firebaseUid: string, updates: { name?: string; avatar?: string }) {
+export async function updateUserProfile(
+  firebaseUid: string,
+  updates: { name?: string; nickname?: string; avatar?: string },
+) {
   const userDoc = doc(db, "users", firebaseUid);
   const payload: Partial<AppUser> = {};
   if (typeof updates.name === "string") payload.name = updates.name;
+  if (typeof updates.nickname === "string") payload.nickname = updates.nickname;
   if (typeof updates.avatar === "string") payload.avatar = updates.avatar;
 
   if (Object.keys(payload).length > 0) {

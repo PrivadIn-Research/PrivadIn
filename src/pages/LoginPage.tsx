@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isFirebaseConfigured } from "../services/firebase";
 import { AuthLoginError, loginErrorMessage } from "../utils/authErrors";
 
-export function LoginPage() {
+export function LoginPage({ cooldownMinutes }: { cooldownMinutes: number }) {
   const { login, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,23 +55,27 @@ export function LoginPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(250,204,21,0.18),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(45,212,191,0.14),transparent_26%),linear-gradient(135deg,#020617,#111827_55%,#1f2937)]" />
-      <main className="relative mx-auto grid min-h-screen max-w-6xl place-items-center px-4 py-10">
-        <div className="grid w-full items-center gap-8 lg:grid-cols-[1fr_440px]">
-          <section className="space-y-6">
+      <main className="relative mx-auto min-h-screen max-w-6xl px-4 py-4 sm:px-6 sm:py-6 lg:grid lg:place-items-center lg:px-4 lg:py-10">
+        <div className="grid w-full gap-6 lg:grid-cols-[1fr_440px] lg:items-center lg:gap-8">
+          <section className="order-2 space-y-5 pt-2 lg:order-1 lg:space-y-6 lg:pt-0">
             <div className="inline-flex items-center gap-2 rounded-full border border-yellow-200/20 bg-yellow-300/10 px-4 py-2 text-sm font-bold text-yellow-100">
               <Sparkles size={16} />
               Competicao sanitaria corporativa
             </div>
             <div>
-              <h1 className="max-w-3xl text-5xl font-black leading-none text-white sm:text-7xl">
+              <h1 className="max-w-3xl text-4xl font-black leading-none text-white sm:text-5xl lg:text-7xl">
                 PrivadIn
               </h1>
-              <p className="mt-5 max-w-2xl text-lg text-slate-300 sm:text-xl">
+              <p className="mt-4 max-w-2xl text-base text-slate-300 sm:text-lg lg:mt-5 lg:text-xl">
                 Registre seus momentos de produtividade paralela, dispute o ranking dos amigos e transforme o expediente em esporte de alto rendimento.
               </p>
             </div>
             <div className="grid max-w-2xl gap-3 sm:grid-cols-3">
-              {["Ranking em tempo real", "Streaks e conquistas", "Anti-fraude 15 min"].map((item) => (
+              {[
+                "Ranking em tempo real",
+                "Streaks e conquistas",
+                `Anti-fraude ${cooldownMinutes} min`,
+              ].map((item) => (
                 <div key={item} className="rounded-2xl border border-white/10 bg-white/8 p-4 text-sm font-bold text-slate-200 backdrop-blur-xl">
                   {item}
                 </div>
@@ -79,7 +83,7 @@ export function LoginPage() {
             </div>
           </section>
 
-          <form onSubmit={handleSubmit} className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl shadow-black/30 backdrop-blur-2xl">
+          <form onSubmit={handleSubmit} className="order-1 rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl shadow-black/30 backdrop-blur-2xl sm:p-6 lg:order-2">
             <div className="mb-6 text-center">
               <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-yellow-300 text-5xl shadow-xl shadow-yellow-400/20">
                 🚽

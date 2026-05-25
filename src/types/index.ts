@@ -7,6 +7,7 @@ export type UserRole = "player" | "admin";
 export interface AppUser {
   uid: string;
   name: string;
+  nickname?: string;
   email: string;
   avatar: string;
   role: UserRole;
@@ -29,7 +30,19 @@ export interface PoopLog {
   isWeeklyActive: boolean;
 }
 
-export type AdminAuditAction = "adjust_points" | "remove_log" | "reset_weekly";
+export interface AppSettings {
+  cooldownMinutes: number;
+  pointsPerLog: number;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
+export type AdminAuditAction =
+  | "adjust_points"
+  | "remove_log"
+  | "reset_weekly"
+  | "update_cooldown"
+  | "update_points_per_log";
 
 export interface AdminAuditLog {
   id: string;

@@ -25,7 +25,7 @@ export const usersRef = collection(db, "users");
 export const logsRef = collection(db, "poop_logs");
 export const adminLogsRef = collection(db, "admin_audit_logs");
 
-function createAuditLog({
+export function createAuditLog({
   action,
   admin,
   targetUser,
@@ -72,8 +72,13 @@ export function adminAuditLogsQuery() {
   return query(adminLogsRef, orderBy("createdAt", "desc"));
 }
 
-export async function registerPoop(user: AppUser, userLogs: PoopLog[]) {
-  const cooldown = getCooldownSeconds(userLogs);
+export async function registerPoop(
+  user: AppUser,
+  userLogs: PoopLog[],
+  cooldownMinutes: number,
+  pointsPerLog: number,
+) {
+  const cooldown = getCooldownSeconds(userLogs, cooldownMinutes);
   if (cooldown > 0) {
     throw new Error(`Calma, campeão. O trono libera em ${Math.ceil(cooldown / 60)} minuto(s).`);
   }
@@ -89,7 +94,7 @@ export async function registerPoop(user: AppUser, userLogs: PoopLog[]) {
       userId: user.uid,
       userName: user.name,
       createdAt: now,
-      points: 2000,
+      points: pointsPerLog,
       isWeeklyActive: true,
     },
     ...userLogs,
@@ -100,13 +105,13 @@ export async function registerPoop(user: AppUser, userLogs: PoopLog[]) {
     userId: user.uid,
     userName: user.name,
     createdAt: now,
-    points: 2000,
+    points: pointsPerLog,
     isWeeklyActive: true,
   });
 
   await updateDoc(userDoc, {
-    totalPoints: increment(2000),
-    weeklyPoints: increment(2000),
+    totalPoints: increment(pointsPerLog),
+    weeklyPoints: increment(pointsPerLog),
     firstLogAt: user.firstLogAt ?? now,
     lastLogAt: now,
     currentDailyStreak: calculateDailyStreak(nextLogs),

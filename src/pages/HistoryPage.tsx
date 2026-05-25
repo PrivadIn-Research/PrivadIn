@@ -7,11 +7,13 @@ export function HistoryPage({ logs }: { logs: PoopLog[] }) {
   const buckets = buildDailyBuckets(logs);
 
   return (
-    <div className="space-y-5">
-      <section className="grid gap-4 md:grid-cols-3">
+    <div className="space-y-4 sm:space-y-5">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
         <MetricCard icon="📅" label="Hoje" value={countToday(logs)} hint="Quantidade diaria" />
         <MetricCard icon="🗓️" label="Semana" value={countThisWeek(logs)} hint="Desde segunda-feira" />
-        <MetricCard icon="🧾" label="Historico total" value={logs.length} hint="Registros pessoais" />
+        <div className="col-span-2 md:col-span-1">
+          <MetricCard icon="🧾" label="Historico total" value={logs.length} hint="Registros pessoais" />
+        </div>
       </section>
 
       <Card>
@@ -34,15 +36,15 @@ export function HistoryPage({ logs }: { logs: PoopLog[] }) {
             </div>
           ) : (
             logs.map((log, index) => (
-              <div key={log.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-yellow-300/15 text-xl">
+              <div key={log.id} className="flex items-start gap-2.5 rounded-xl border border-white/10 bg-white/5 p-3 sm:items-center sm:gap-3 sm:rounded-2xl sm:p-4">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-yellow-300/15 text-lg sm:h-11 sm:w-11 sm:rounded-2xl sm:text-xl">
                   🚽
                 </div>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <p className="font-black text-white">Registro #{logs.length - index}</p>
-                  <p className="text-sm text-slate-400">{formatDateTime(log.createdAt)}</p>
+                  <p className="text-xs text-slate-400 sm:text-sm">{formatDateTime(log.createdAt)}</p>
                 </div>
-                <span className="rounded-full bg-yellow-300 px-3 py-1 text-sm font-black text-slate-950">
+                <span className="self-start rounded-full bg-yellow-300 px-2.5 py-1 text-xs font-black text-slate-950 sm:self-auto sm:px-3 sm:text-sm">
                   +{log.points}
                 </span>
               </div>

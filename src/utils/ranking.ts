@@ -1,5 +1,7 @@
 import type { AppUser, RankedUser } from "../types";
 
+const DICEBEAR_URL_PREFIX = "https://api.dicebear.com/";
+
 export function rankUsers(users: AppUser[]): RankedUser[] {
   const overall = [...users].sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
@@ -41,4 +43,46 @@ export function titleFor(rank: number) {
 export function avatarFor(name: string, email: string) {
   const seed = encodeURIComponent(name || email);
   return `https://api.dicebear.com/9.x/thumbs/svg?seed=${seed}&backgroundColor=facc15,f59e0b,0f172a`;
+}
+
+export function isValidDicebearUrl(value: string) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue.startsWith(DICEBEAR_URL_PREFIX)) return false;
+
+  try {
+    const url = new URL(trimmedValue);
+    return url.href.startsWith(DICEBEAR_URL_PREFIX);
+  } catch {
+    return false;
+  }
+}
+
+export function canLoadDicebearUrl(value: string) {
+  const trimmedValue = value.trim();
+  if (!isValidDicebearUrl(trimmedValue)) return Promise.resolve(false);
+
+  return new Promise<boolean>((resolve) => {
+    const image = new Image();
+    const timeoutId = window.setTimeout(() => {
+      image.onload = null;
+      image.onerror = null;
+      resolve(false);
+    }, 5000);
+
+    image.onload = () => {
+      window.clearTimeout(timeoutId);
+      image.onload = null;
+      image.onerror = null;
+      resolve(true);
+    };
+
+    image.onerror = () => {
+      window.clearTimeout(timeoutId);
+      image.onload = null;
+      image.onerror = null;
+      resolve(false);
+    };
+
+    image.src = trimmedValue;
+  });
 }

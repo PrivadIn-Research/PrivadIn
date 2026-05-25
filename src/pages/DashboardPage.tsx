@@ -11,21 +11,33 @@ export function DashboardPage({
   user,
   rankedUsers,
   userLogs,
+  cooldownMinutes,
+  pointsPerLog,
   onPlaySound,
 }: {
   user: AppUser;
   rankedUsers: RankedUser[];
   userLogs: PoopLog[];
+  cooldownMinutes: number;
+  pointsPerLog: number;
   onPlaySound: () => void;
 }) {
   const currentRank = rankedUsers.find((ranked) => ranked.uid === user.uid);
   const lastLog = getLastLog(userLogs);
-  const cooldownSeconds = getCooldownSeconds(userLogs);
+  const cooldownSeconds = getCooldownSeconds(userLogs, cooldownMinutes);
+  const formattedPointsPerLog = pointsPerLog.toLocaleString("pt-BR");
+  const isOnCooldown = cooldownSeconds > 0;
+  const cooldownWarningMessage = "Está querendo roubar? Aposto que é o mário";
 
   async function handleRegister() {
+    if (isOnCooldown) {
+      toast.error(cooldownWarningMessage);
+      return;
+    }
+
     const previousRank = currentRank?.rank ?? rankedUsers.length;
     try {
-      await registerPoop(user, userLogs);
+      await registerPoop(user, userLogs, cooldownMinutes, pointsPerLog);
       onPlaySound();
       toast.success("Registro feito. A firma jamais sabera a grandeza desse momento.");
       if ((currentRank?.rank ?? previousRank) <= previousRank) {
@@ -39,7 +51,9 @@ export function DashboardPage({
   async function handleShareRanking() {
     const rankingText = rankedUsers
       .sort((a, b) => a.rank - b.rank)
-      .map((ranked) => `${ranked.rank}. ${ranked.name} - ${ranked.totalPoints} pontos`)
+      .map((ranked) =>
+        `${ranked.rank}. ${ranked.name}${ranked.nickname?.trim() ? ` (${ranked.nickname.trim()})` : ""} - ${ranked.totalPoints} pontos`,
+      )
       .join("\n");
     const text = `Ranking atual do PrivadIn:\n\n${rankingText || "Sem jogadores no ranking ainda."}`;
 
@@ -60,32 +74,39 @@ export function DashboardPage({
   }
 
   return (
-    <div className="space-y-5">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon="💩" label="Seu total" value={user.totalPoints} hint="Cada registro vale 1 ponto" />
+    <div className="flex flex-col gap-4 sm:gap-5">
+      <section className="order-2 grid grid-cols-2 gap-3 sm:gap-4 md:order-1 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard icon="💩" label="Seu total" value={user.totalPoints} hint={`Cada registro vale ${formattedPointsPerLog} pontos`} />
         <MetricCard icon="🏆" label="Posicao geral" value={`#${currentRank?.rank ?? "-"}`} hint="Empate favorece quem registrou primeiro" />
         <MetricCard icon="🔥" label="Streak diaria" value={`${user.currentDailyStreak}d`} hint={`${user.currentWeeklyStreak} semana(s) ativa(s)`} />
         <MetricCard icon="🕘" label="Ultima cagada" value={formatHour(lastLog?.createdAt)} hint={formatDateTime(lastLog?.createdAt)} />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1fr_380px]">
-        <Card className="relative overflow-hidden p-6">
-          <div className="absolute right-6 top-6 hidden text-8xl opacity-10 sm:block">🚽</div>
+      <section className="order-1 grid gap-4 sm:gap-5 md:order-2 xl:grid-cols-[1fr_380px]">
+        <Card className="relative overflow-hidden p-4 sm:p-6">
+          <div className="absolute right-4 top-4 hidden text-8xl opacity-10 sm:right-6 sm:top-6 sm:block">🚽</div>
           <div className="relative max-w-2xl">
-            <span className="inline-flex items-center gap-2 rounded-full bg-yellow-300/15 px-3 py-1 text-sm font-bold text-yellow-100">
+            <span className="inline-flex items-center gap-2 rounded-full bg-yellow-300/15 px-3 py-1 text-xs font-bold text-yellow-100 sm:text-sm">
               <TimerReset size={15} />
-              Cooldown anti-fraude: 15 minutos
+              Cooldown anti-fraude: {cooldownMinutes} minuto{cooldownMinutes === 1 ? "" : "s"}
             </span>
-            <h2 className="mt-4 text-3xl font-black text-white sm:text-5xl">Momento de gloria remunerada?</h2>
-            <p className="mt-3 text-slate-300">
-              Registre automaticamente data e horario, some ponto e dispute o trono em tempo real.
+            <h2 className="mt-4 text-2xl font-black leading-tight text-white sm:text-5xl">Momento de gloria remunerada?</h2>
+            <p className="mt-3 text-sm text-slate-300 sm:text-base">
+              Registre automaticamente data e horario, ganhe {formattedPointsPerLog} pontos e dispute o trono em tempo real.
             </p>
             <button
               onClick={handleRegister}
-              disabled={cooldownSeconds > 0}
-              className="mt-6 w-full rounded-3xl bg-yellow-300 px-6 py-6 text-xl font-black text-slate-950 shadow-xl shadow-yellow-300/20 transition hover:-translate-y-1 hover:bg-yellow-200 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              aria-disabled={isOnCooldown}
+              title={isOnCooldown ? cooldownWarningMessage : "Registrar pontuacao"}
+              className={`mt-6 w-full rounded-2xl bg-yellow-300 px-5 py-4 text-base font-black text-slate-950 shadow-xl shadow-yellow-300/20 transition sm:w-auto sm:rounded-3xl sm:px-6 sm:py-6 sm:text-xl ${
+                isOnCooldown
+                  ? "cursor-not-allowed opacity-60"
+                  : "hover:-translate-y-1 hover:bg-yellow-200"
+              }`}
             >
-              {cooldownSeconds > 0 ? `AGUARDE ${Math.ceil(cooldownSeconds / 60)} MIN` : "REGISTRAR CAGADA"}
+              {isOnCooldown
+                ? `AGUARDE ${Math.ceil(cooldownSeconds / 60)} MIN`
+                : `REGISTRAR CAGADA (+${formattedPointsPerLog})`}
             </button>
           </div>
         </Card>
@@ -102,7 +123,7 @@ export function DashboardPage({
         </Card>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-4 sm:gap-5 xl:grid-cols-2">
         <Card>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -111,7 +132,7 @@ export function DashboardPage({
             </div>
             <button
               onClick={handleShareRanking}
-              className="inline-flex items-center gap-2 rounded-2xl border border-yellow-200/20 bg-yellow-300/15 px-4 py-3 text-sm font-black text-yellow-100 transition hover:bg-yellow-300 hover:text-slate-950"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-yellow-200/20 bg-yellow-300/15 px-4 py-3 text-sm font-black text-yellow-100 transition hover:bg-yellow-300 hover:text-slate-950 sm:w-auto"
               title="Compartilhar ranking atual"
             >
               <Share2 size={18} />

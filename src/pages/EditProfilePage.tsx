@@ -74,7 +74,7 @@ export function EditProfilePage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       <Card>
         <div className="mb-4">
           <p className="text-sm font-bold text-yellow-100">Editar perfil</p>
@@ -162,15 +162,15 @@ export function EditProfilePage() {
             ) : null}
           </label>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
             <img src={previewAvatar} alt="avatar" className="h-16 w-16 rounded-full" />
-            <div className="flex-1">
+            <div className="w-full flex-1">
               <p className="font-black text-white">Avatar atual</p>
               <p className="text-sm text-slate-400">Cole um link da DiceBear para trocar a imagem.</p>
             </div>
             <button
               disabled={busy || !hasValidAvatar}
-              className="rounded-2xl bg-yellow-300 px-5 py-3 font-black text-slate-950 hover:bg-yellow-200 disabled:opacity-60"
+              className="w-full rounded-2xl bg-yellow-300 px-5 py-3 font-black text-slate-950 hover:bg-yellow-200 disabled:opacity-60 sm:w-auto"
             >
               Salvar
             </button>

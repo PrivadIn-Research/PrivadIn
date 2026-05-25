@@ -22,32 +22,32 @@ export function RankingList({
           <div
             key={user.uid}
             className={clsx(
-              "flex items-center gap-3 rounded-2xl border p-3 transition",
+              "flex items-center gap-2.5 rounded-xl border p-2.5 transition sm:gap-3 sm:rounded-2xl sm:p-3",
               rank <= 3
                 ? "border-yellow-200/25 bg-yellow-300/12"
                 : "border-white/10 bg-white/6",
               user.uid === currentUid && "ring-2 ring-yellow-300/70",
             )}
           >
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-950/70 text-2xl">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-950/70 text-xl sm:h-12 sm:w-12 sm:rounded-2xl sm:text-2xl">
               {medalFor(rank)}
             </div>
-            <img src={user.avatar} alt="" className="h-11 w-11 rounded-full bg-yellow-100" />
+            <img src={user.avatar} alt="" className="h-10 w-10 rounded-full bg-yellow-100 sm:h-11 sm:w-11" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate font-black text-white">{user.name}</p>
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-yellow-100">
+                <p className="truncate text-sm font-black text-white sm:text-base">{user.name}</p>
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-yellow-100 sm:text-xs">
                   #{rank}
                 </span>
               </div>
               {user.nickname?.trim() ? (
-                <p className="truncate text-xs font-semibold text-yellow-100">{user.nickname.trim()}</p>
+                <p className="truncate text-[11px] font-semibold text-yellow-100 sm:text-xs">{user.nickname.trim()}</p>
               ) : null}
-              <p className="text-xs text-slate-400">{titleFor(rank)}</p>
+              <p className="text-[11px] text-slate-400 sm:text-xs">{titleFor(rank)}</p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-black text-yellow-200">{points}</p>
-              <p className="text-xs text-slate-400">pts</p>
+              <p className="text-xl font-black text-yellow-200 sm:text-2xl">{points}</p>
+              <p className="text-[10px] text-slate-400 sm:text-xs">pts</p>
             </div>
           </div>
         );

@@ -40,6 +40,9 @@ export function RankingList({
                   #{rank}
                 </span>
               </div>
+              {user.nickname?.trim() ? (
+                <p className="truncate text-xs font-semibold text-yellow-100">{user.nickname.trim()}</p>
+              ) : null}
               <p className="text-xs text-slate-400">{titleFor(rank)}</p>
             </div>
             <div className="text-right">

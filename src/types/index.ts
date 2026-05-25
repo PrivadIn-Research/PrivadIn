@@ -7,6 +7,7 @@ export type UserRole = "player" | "admin";
 export interface AppUser {
   uid: string;
   name: string;
+  nickname?: string;
   email: string;
   avatar: string;
   role: UserRole;

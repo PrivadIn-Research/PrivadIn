@@ -1,9 +1,10 @@
 import { BarChart3, History, LayoutDashboard, LogOut, Shield, Volume2, VolumeX, User } from "lucide-react";
-import type { AppView } from "../types";
+import type { AppUser, AppView } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { clsx } from "clsx";
 
 interface ShellProps {
+  currentUser: AppUser | null;
   view: AppView;
   onViewChange: (view: AppView) => void;
   muted: boolean;
@@ -18,9 +19,12 @@ const items: Array<{ view: AppView; label: string; icon: React.ElementType }> = 
   { view: "profile", label: "Perfil", icon: User },
 ];
 
-export function Shell({ view, onViewChange, muted, onToggleMuted, children }: ShellProps) {
-  const { user, logout } = useAuth();
-  const navItems = user?.role === "admin" ? [...items, { view: "admin" as AppView, label: "Admin", icon: Shield }] : items;
+export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, children }: ShellProps) {
+  const { logout } = useAuth();
+  const navItems =
+    currentUser?.role === "admin"
+      ? [...items, { view: "admin" as AppView, label: "Admin", icon: Shield }]
+      : items;
 
   return (
     <div className="min-h-screen overflow-hidden bg-slate-950 text-slate-100">
@@ -46,10 +50,10 @@ export function Shell({ view, onViewChange, muted, onToggleMuted, children }: Sh
               {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             </button>
             <div className="hidden items-center gap-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 sm:flex">
-              <img className="h-8 w-8 rounded-full bg-yellow-200" src={user?.avatar} alt="" />
+              <img className="h-8 w-8 rounded-full bg-yellow-200" src={currentUser?.avatar} alt="" />
               <div className="leading-tight">
-                <p className="text-sm font-bold text-white">{user?.name}</p>
-                <p className="text-xs text-slate-400">{user?.role === "admin" ? "Fiscal supremo" : "Competidor"}</p>
+                <p className="text-sm font-bold text-white">{currentUser?.name}</p>
+                <p className="text-xs text-slate-400">{currentUser?.role === "admin" ? "Fiscal supremo" : "Competidor"}</p>
               </div>
             </div>
             <button

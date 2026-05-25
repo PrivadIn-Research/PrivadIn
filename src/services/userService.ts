@@ -1,7 +1,16 @@
 import { updateProfile } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
-import { auth, db } from "./firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth, db, storage } from "./firebase";
 import type { AppUser } from "../types";
+
+export async function uploadAvatarFile(firebaseUid: string, file: File) {
+  const path = `avatars/${firebaseUid}/${Date.now()}_${file.name}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  return url;
+}
 
 export async function updateUserProfile(firebaseUid: string, updates: { name?: string; avatar?: string }) {
   const userDoc = doc(db, "users", firebaseUid);

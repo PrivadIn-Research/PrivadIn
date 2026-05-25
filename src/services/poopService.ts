@@ -89,7 +89,7 @@ export async function registerPoop(user: AppUser, userLogs: PoopLog[]) {
       userId: user.uid,
       userName: user.name,
       createdAt: now,
-      points: 1,
+      points: 2000,
       isWeeklyActive: true,
     },
     ...userLogs,
@@ -100,13 +100,13 @@ export async function registerPoop(user: AppUser, userLogs: PoopLog[]) {
     userId: user.uid,
     userName: user.name,
     createdAt: now,
-    points: 1
+    points: 2000,
     isWeeklyActive: true,
   });
 
   await updateDoc(userDoc, {
-    totalPoints: increment(1),
-    weeklyPoints: increment(1),
+    totalPoints: increment(2000),
+    weeklyPoints: increment(2000),
     firstLogAt: user.firstLogAt ?? now,
     lastLogAt: now,
     currentDailyStreak: calculateDailyStreak(nextLogs),

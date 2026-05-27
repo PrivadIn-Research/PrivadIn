@@ -16,18 +16,15 @@ jobs:
         run: npm ci && npm run build
 
       # Passo 1: Deploy das regras do Firestore usando a Service Account correta
-      - name: Deploy Firestore Rules
-        run: npx firebase-tools@15.18.0 deploy --only firestore:rules --non-interactive --project=privadin-d7ebe
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
-        # Se o comando acima chiar por falta de auth, podemos usar a variável que a CLI do Firebase lê nativamente:
-        # env:
-        #   FIREBASE_TOKEN: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRIVADIN_D7EBE }}
+      # - name: Deploy Firestore Rules
+      #   run: npx firebase-tools@15.18.0 deploy --only firestore:rules --non-interactive --project=privadin-d7ebe
+      #   env:
+      #     FIREBASE_TOKEN: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRIVADIN_D7EBE }}
 
-      # Passo 2: A Action oficial faz o deploy do Hosting isolado
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRIVADIN_D7EBE }}
-          channelId: live
-          projectId: privadin-d7ebe
+      # # Passo 2: A Action oficial faz o deploy do Hosting isolado
+      # - uses: FirebaseExtended/action-hosting-deploy@v0
+      #   with:
+      #     repoToken: ${{ secrets.GITHUB_TOKEN }}
+      #     firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRIVADIN_D7EBE }}
+      #     channelId: live
+      #     projectId: privadin-d7ebe

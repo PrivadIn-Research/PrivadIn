@@ -44,10 +44,10 @@ jobs:
           VITE_DAILY_LOG_LIMIT: ${{ secrets.VITE_DAILY_LOG_LIMIT }}
 
       # Injeção direta da Service Account para o deploy das regras do Firestore
-      - name: Deploy Firestore Rules
-        run: npx firebase-tools@15.18.0 deploy --only firestore:rules --non-interactive --project=privadin-d7ebe
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      # - name: Deploy Firestore Rules
+      #   run: npx firebase-tools@15.18.0 deploy --only firestore:rules --non-interactive --project=privadin-d7ebe
+      #   env:
+      #     FIREBASE_TOKEN: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       # Injeção direta da Service Account para o deploy do Hosting
       - name: Deploy Hosting

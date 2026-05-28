@@ -47,7 +47,7 @@ export function getCuiterAvailableCredits(userLogsCount: number, userPostsCount:
 }
 
 export function canPostOnCuiter(user: AppUser, userLogsCount: number, userPostsCount: number) {
-  if (!user.lastLogAt) return false;
+  if (!user.lastLogAt && !user.firstLogAt) return false;
   return getCuiterAvailableCredits(userLogsCount, userPostsCount) > 0;
 }
 
@@ -57,6 +57,10 @@ export async function createCuiterPost(
   userLogsCount: number,
   userPostsCount: number,
 ) {
+  if (!user.lastLogAt && !user.firstLogAt) {
+    throw new Error("Para publicar no Cuiter, registre uma cagada primeiro.");
+  }
+
   if (!canPostOnCuiter(user, userLogsCount, userPostsCount)) {
     throw new Error("Clique em Registrar cagada novamente para liberar um novo post.");
   }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
+import { FirebaseError } from "firebase/app";
 import toast from "react-hot-toast";
 import { MessageCircle, Send } from "lucide-react";
 import { Card } from "../components/Card";
@@ -14,7 +15,15 @@ import {
 import type { AppUser, CuiterPost, PoopLog } from "../types";
 import { formatTimeAgo, toDate } from "../utils/date";
 
-export function CuiterPage({ user, userLogs }: { user: AppUser; userLogs: PoopLog[] }) {
+export function CuiterPage({
+  user,
+  userLogs,
+  users,
+}: {
+  user: AppUser;
+  userLogs: PoopLog[];
+  users: AppUser[];
+}) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [posts, setPosts] = useState<CuiterPost[]>([]);
@@ -33,6 +42,10 @@ export function CuiterPage({ user, userLogs }: { user: AppUser; userLogs: PoopLo
   const availableCredits = getCuiterAvailableCredits(eligibleLogsCount, userPostsCount);
   const unlocked = canPostOnCuiter(user, eligibleLogsCount, userPostsCount);
   const canPublish = unlocked && !sending && charsCount > 0 && charsCount <= CUITER_MAX_CHARS;
+
+  function isFirestorePermissionDenied(error: unknown): error is FirebaseError {
+    return error instanceof FirebaseError && error.code === "permission-denied";
+  }
 
   const orderedPosts = useMemo(
     () =>
@@ -91,7 +104,13 @@ export function CuiterPage({ user, userLogs }: { user: AppUser; userLogs: PoopLo
       setMessage("");
       toast.success("Postado no Cuiter.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Nao foi possivel publicar agora.");
+      if (isFirestorePermissionDenied(error)) {
+        toast.error(
+          "Permissao negada. Para publicar no Cuiter, registre uma cagada antes de postar.",
+        );
+      } else {
+        toast.error(error instanceof Error ? error.message : "Nao foi possivel publicar agora.");
+      }
     } finally {
       setSending(false);
     }
@@ -154,15 +173,20 @@ export function CuiterPage({ user, userLogs }: { user: AppUser; userLogs: PoopLo
               Ainda nao ha posts no Cuiter.
             </div>
           ) : (
-            orderedPosts.map((post) => (
-              <article key={post.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="truncate text-sm font-black text-white">{post.userName}</p>
-                  <p className="shrink-0 text-xs text-slate-400">{formatTimeAgo(post.createdAt)}</p>
-                </div>
-                <p className="text-sm text-slate-200">{post.message}</p>
-              </article>
-            ))
+            orderedPosts.map((post) => {
+              const author = users.find((candidate) => candidate.uid === post.userId);
+              return (
+                <article key={post.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="truncate text-sm font-black text-white">
+                      {author?.name}
+                    </p>
+                    <p className="shrink-0 text-xs text-slate-400">{formatTimeAgo(post.createdAt)}</p>
+                  </div>
+                  <p className="text-sm text-slate-200">{post.message}</p>
+                </article>
+              );
+            })
           )}
         </div>
         {hasMore && !loadingFeed ? (

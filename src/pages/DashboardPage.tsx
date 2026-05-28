@@ -93,7 +93,7 @@ export function DashboardPage({
               <TimerReset size={15} />
               Cooldown anti-fraude: {cooldownMinutes} minuto{cooldownMinutes === 1 ? "" : "s"}
             </span>
-            <h2 className="mt-4 text-2xl font-black leading-tight text-white sm:text-5xl">Momento de gloria remunerada?</h2>
+            <h2 className="mt-4 text-2xl font-black leading-tight text-white sm:text-5xl">Momento de glória remunerada?</h2>
             <p className="mt-3 text-sm text-slate-300 sm:text-base">
               Registre automaticamente data e horário, ganhe {formattedPointsPerLog} pontos e dispute o trono em tempo real.
             </p>

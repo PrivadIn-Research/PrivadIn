@@ -3,7 +3,7 @@ import type { AppLanguage } from "../types";
 
 export const APP_LANGUAGE_STORAGE_KEY = "privadin-language";
 export const DEFAULT_LANGUAGE: AppLanguage = "pt-BR";
-export const SUPPORTED_LANGUAGES: AppLanguage[] = ["pt-BR", "en-US", "es-ES", "zh-Hans", "ar"];
+export const SUPPORTED_LANGUAGES: AppLanguage[] = ["pt-BR", "en-US", "es-ES", "zh-Hans", "ar", "jam-JM", "pap-CW"];
 
 const DATE_FNS_LOCALES = {
   ar: arSA,
@@ -11,6 +11,8 @@ const DATE_FNS_LOCALES = {
   "en-US": enUS,
   "es-ES": es,
   "zh-Hans": zhCN,
+  "jam-JM": enUS,
+  "pap-CW": enUS,
 } as const;
 
 export function normalizeAppLanguage(language?: string | null): AppLanguage | null {
@@ -22,6 +24,8 @@ export function normalizeAppLanguage(language?: string | null): AppLanguage | nu
   if (normalized.startsWith("en")) return "en-US";
   if (normalized.startsWith("es")) return "es-ES";
   if (normalized === "zh-hans" || normalized.startsWith("zh-cn") || normalized.startsWith("zh")) return "zh-Hans";
+  if (normalized === "jam" || normalized.startsWith("jam-")) return "jam-JM";
+  if (normalized === "pap" || normalized.startsWith("pap-")) return "pap-CW";
   return null;
 }
 
@@ -43,6 +47,8 @@ export function getLanguageLabel(language: AppLanguage) {
   if (language === "es-ES") return "🇪🇸 Español";
   if (language === "zh-Hans") return "🇨🇳 简体中文";
   if (language === "en-US") return "🇺🇸 English";
+  if (language === "jam-JM") return "🇯🇲 Jamaican Patois";
+  if (language === "pap-CW") return "🏝️ Papiamento";
   return "🇧🇷 Português";
 }
 
@@ -51,6 +57,8 @@ export function getLanguageCompactLabel(language: AppLanguage) {
   if (language === "es-ES") return "ES";
   if (language === "zh-Hans") return "中文";
   if (language === "en-US") return "EN";
+  if (language === "jam-JM") return "🇯🇲";
+  if (language === "pap-CW") return "🏝️";
   return "PT";
 }
 

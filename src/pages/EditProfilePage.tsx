@@ -147,7 +147,7 @@ export function EditProfilePage() {
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               placeholder={t("nicknamePlaceholder")}
-              maxLength={35}
+              maxLength={15}
             />
             <p className="mt-2 text-xs text-slate-500">{t("charsCount", { count: nickname.length })}</p>
           </label>

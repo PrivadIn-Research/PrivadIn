@@ -1,6 +1,6 @@
 import confetti from "canvas-confetti";
 import toast from "react-hot-toast";
-import { Crown, Share2, TimerReset } from "lucide-react";
+import { Share2, TimerReset } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, MetricCard } from "../components/Card";
 import { RankingList } from "../components/RankingList";
@@ -124,7 +124,6 @@ export function DashboardPage({
             </button>
           </div>
         </Card>
-
       </section>
 
       <section className="order-2 grid gap-4 sm:gap-5 xl:grid-cols-2">

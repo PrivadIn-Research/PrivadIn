@@ -89,7 +89,7 @@ export function DashboardPage({
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
-      <section className="order-2 grid grid-cols-2 gap-3 sm:gap-4 md:order-1 md:grid-cols-2 xl:grid-cols-4">
+      <section className="order-3 grid grid-cols-2 gap-3 sm:gap-4 md:order-1 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon="💩" label={t("metric.total")} value={formatNumber(user.totalPoints)} hint={t("metric.totalHint", { points: formattedPointsPerLog })} />
         <MetricCard icon="🏆" label={t("metric.rank")} value={`#${currentRank?.rank ?? "-"}`} hint={t("metric.rankHint")} />
         <MetricCard icon="🔥" label={t("metric.streak")} value={`${user.currentDailyStreak}d`} hint={t("metric.streakHint", { count: user.currentWeeklyStreak })} />
@@ -125,26 +125,16 @@ export function DashboardPage({
           </div>
         </Card>
 
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-bold text-accent-strong">{t("podiumEyebrow")}</p>
-              <h2 className="text-xl font-black text-fg">{t("podiumTitle")}</h2>
-            </div>
-            <Crown className="text-accent-strong" />
-          </div>
-          <RankingList users={rankedUsers.slice(0, 3)} currentUid={user.uid} />
-        </Card>
       </section>
 
-      <section className="grid gap-4 sm:gap-5 xl:grid-cols-2">
+      <section className="order-2 grid gap-4 sm:gap-5 xl:grid-cols-2">
         <Card>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-accent-strong">{t("overallEyebrow")}</p>
-              <h2 className="text-2xl font-black text-fg">{t("overallTitle")}</h2>
-            </div>
-            <button
+          <div className="mb-4">
+            <p className="text-sm font-bold text-accent-strong">{t("weeklyEyebrow", { count: countThisWeek(userLogs) })}</p>
+            <h2 className="text-2xl font-black text-fg">{t("weeklyTitle")}</h2>
+          </div>
+          <RankingList users={rankedUsers} mode="weekly" currentUid={user.uid} />
+          <button
               onClick={handleShareRanking}
               className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-accent-soft/35 px-4 py-3 text-sm font-black text-accent-strong transition hover:bg-accent hover:text-accent-fg sm:w-auto"
               title={t("shareTitle")}
@@ -152,15 +142,16 @@ export function DashboardPage({
               <Share2 size={18} />
               {t("shareAction")}
             </button>
-          </div>
-          <RankingList users={rankedUsers} currentUid={user.uid} />
         </Card>
         <Card>
-          <div className="mb-4">
-            <p className="text-sm font-bold text-accent-strong">{t("weeklyEyebrow", { count: countThisWeek(userLogs) })}</p>
-            <h2 className="text-2xl font-black text-fg">{t("weeklyTitle")}</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-accent-strong">{t("overallEyebrow")}</p>
+              <h2 className="text-2xl font-black text-fg">{t("overallTitle")}</h2>
+            </div>
+            
           </div>
-          <RankingList users={rankedUsers} mode="weekly" currentUid={user.uid} />
+          <RankingList users={rankedUsers} currentUid={user.uid} />
         </Card>
       </section>
     </div>

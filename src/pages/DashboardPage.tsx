@@ -124,7 +124,6 @@ export function DashboardPage({
             </button>
           </div>
         </Card>
-
       </section>
 
       <section className="order-2 grid gap-4 sm:gap-5 xl:grid-cols-2">

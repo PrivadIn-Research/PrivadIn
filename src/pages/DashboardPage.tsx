@@ -1,6 +1,7 @@
 import confetti from "canvas-confetti";
 import toast from "react-hot-toast";
-import { Share2, TimerReset } from "lucide-react";
+import { Loader2, Share2, TimerReset } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, MetricCard } from "../components/Card";
 import { RankingList } from "../components/RankingList";
@@ -37,14 +38,18 @@ export function DashboardPage({
     : 0;
   const cooldownSeconds = Math.max(logCooldownSeconds, userCooldownSeconds);
   const formattedPointsPerLog = formatNumber(pointsPerLog);
+  const [isRegistering, setIsRegistering] = useState(false);
   const isOnCooldown = cooldownSeconds > 0;
   const cooldownWarningMessage = t("cooldownWarning");
 
   async function handleRegister() {
-    if (isOnCooldown) {
-      toast.error(cooldownWarningMessage);
+    if (isOnCooldown || isRegistering) {
+      if (isOnCooldown) {
+        toast.error(cooldownWarningMessage);
+      }
       return;
     }
+    setIsRegistering(true);
 
     const previousRank = currentRank?.rank ?? rankedUsers.length;
     try {
@@ -57,6 +62,8 @@ export function DashboardPage({
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("genericRegisterError"));
+    } finally {
+      setIsRegistering(false);
     }
   }
 
@@ -116,17 +123,22 @@ export function DashboardPage({
             </p>
             <button
               onClick={handleRegister}
-              aria-disabled={isOnCooldown}
+              aria-disabled={isOnCooldown || isRegistering}
               title={isOnCooldown ? cooldownWarningMessage : t("registerTooltip")}
+              disabled={isOnCooldown || isRegistering}
               className={`mt-6 w-full rounded-2xl bg-accent px-5 py-4 text-base font-black text-accent-fg shadow-accent transition sm:w-auto sm:rounded-3xl sm:px-6 sm:py-6 sm:text-xl ${
-                isOnCooldown
+                isOnCooldown || isRegistering
                   ? "cursor-not-allowed opacity-60"
                   : "hover:-translate-y-1 hover:bg-accent-strong"
               }`}
             >
-              {isOnCooldown
-                ? t("registerButtonCooldown", { minutes: Math.ceil(cooldownSeconds / 60) })
-                : t("registerButtonReady", { points: formattedPointsPerLog })}
+              {isRegistering ? (
+                <Loader2 className="mx-auto h-5 w-5 animate-spin" aria-label={t("loading")} />
+              ) : isOnCooldown ? (
+                t("registerButtonCooldown", { minutes: Math.ceil(cooldownSeconds / 60) })
+              ) : (
+                t("registerButtonReady", { points: formattedPointsPerLog })
+              )}
             </button>
           </div>
         </Card>

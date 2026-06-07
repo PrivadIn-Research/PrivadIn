@@ -208,7 +208,7 @@ export const registerPoopSecure = onCall(async (request) => {
   return { ok: true };
 });
 
-export const saveSalary = onCall(async (request) => {
+export const saveSalary = onCall({ secrets: ["SALARY_ENCRYPTION_KEY"] }, async (request) => {
   const uid = requireUid(request.auth?.uid);
   const monthlySalaryCents = Math.round(Number(request.data?.monthlySalaryCents));
   if (!Number.isFinite(monthlySalaryCents) || monthlySalaryCents < 0 || monthlySalaryCents > 100_000_000) {
@@ -226,7 +226,7 @@ export const saveSalary = onCall(async (request) => {
   return { ok: true };
 });
 
-export const getSalarySummary = onCall(async (request) => {
+export const getSalarySummary = onCall({ secrets: ["SALARY_ENCRYPTION_KEY"] }, async (request) => {
   const uid = requireUid(request.auth?.uid);
   const [userSnapshot, privateSnapshot, logsSnapshot] = await Promise.all([
     db.collection("users").doc(uid).get(),

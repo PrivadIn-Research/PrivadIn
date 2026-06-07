@@ -5,10 +5,11 @@ import { useTranslation } from "react-i18next";
 import { Card, MetricCard } from "../components/Card";
 import { RankingList } from "../components/RankingList";
 import type { AppUser, PoopLog, RankedUser } from "../types";
-import { registerPoop } from "../services/poopService";
 import { countThisWeek, formatDateTime, formatHour, getCooldownSeconds, getLastLog } from "../utils/date";
 import { formatNumber } from "../utils/format";
 import { toRoman } from "../utils/roman";
+import { requestCurrentLocation } from "../services/locationService";
+import { registerPoopWithBackendValidation } from "../services/secureFunctionsService";
 
 export function DashboardPage({
   user,
@@ -30,7 +31,11 @@ export function DashboardPage({
   const { t } = useTranslation(["dashboard", "common"]);
   const currentRank = rankedUsers.find((ranked) => ranked.uid === user.uid);
   const lastLog = getLastLog(userLogs);
-  const cooldownSeconds = getCooldownSeconds(userLogs, cooldownMinutes);
+  const logCooldownSeconds = getCooldownSeconds(userLogs, cooldownMinutes);
+  const userCooldownSeconds = user.cooldownUntil
+    ? Math.max(0, Math.ceil((user.cooldownUntil.toMillis() - Date.now()) / 1000))
+    : 0;
+  const cooldownSeconds = Math.max(logCooldownSeconds, userCooldownSeconds);
   const formattedPointsPerLog = formatNumber(pointsPerLog);
   const isOnCooldown = cooldownSeconds > 0;
   const cooldownWarningMessage = t("cooldownWarning");
@@ -43,7 +48,8 @@ export function DashboardPage({
 
     const previousRank = currentRank?.rank ?? rankedUsers.length;
     try {
-      await registerPoop(user, userLogs, cooldownMinutes, pointsPerLog);
+      const location = await requestCurrentLocation();
+      await registerPoopWithBackendValidation(location);
       onPlaySound();
       toast.success(t("registerSuccess"));
       if ((currentRank?.rank ?? previousRank) <= previousRank) {

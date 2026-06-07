@@ -1,5 +1,5 @@
 import { updateProfile } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, updateDoc, where, limit } from "firebase/firestore";
+import { Timestamp, collection, doc, getDoc, getDocs, query, updateDoc, where, limit } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import i18n from "../i18n";
 import { auth, db, storage } from "./firebase";
@@ -94,6 +94,35 @@ export async function updateUserProfile(
     if (Object.keys(authUpdates).length > 0) await updateProfile(current, authUpdates);
   }
 
+  const snapshot = await getDoc(userDoc);
+  return snapshot.data() as AppUser;
+}
+
+export async function updateUserOperationalProfile(
+  firebaseUid: string,
+  updates: {
+    workSchedule?: AppUser["workSchedule"];
+    termsAccepted?: boolean;
+    bathroomDurationMinutes?: number;
+  },
+) {
+  const userDoc = doc(db, "users", firebaseUid);
+  const payload: Partial<AppUser> = {};
+
+  if (updates.workSchedule) {
+    payload.workSchedule = updates.workSchedule;
+  }
+
+  if (typeof updates.bathroomDurationMinutes === "number") {
+    payload.bathroomDurationMinutes = Math.max(1, Math.min(180, Math.trunc(updates.bathroomDurationMinutes)));
+  }
+
+  if (updates.termsAccepted === true) {
+    payload.termsAccepted = true;
+    payload.acceptedAt = Timestamp.now();
+  }
+
+  await updateDoc(userDoc, payload);
   const snapshot = await getDoc(userDoc);
   return snapshot.data() as AppUser;
 }

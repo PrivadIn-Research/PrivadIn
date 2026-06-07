@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card } from "../components/Card";
 import type {
@@ -36,6 +37,36 @@ function attemptClass(status: RegistrationAttempt["status"]) {
   if (status === "account_created") return "bg-success-soft/45 text-success";
   if (status === "invalid_code" || status === "failed") return "bg-danger-soft/45 text-danger";
   return "bg-accent-soft/35 text-accent-strong";
+}
+
+function CollapsibleSection({
+  eyebrow,
+  title,
+  description,
+  defaultOpen = false,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group overflow-hidden rounded-3xl border border-line/10 bg-panel-strong/40" open={defaultOpen}>
+      <summary className="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-panel-subtle sm:px-6 sm:py-5">
+        <div>
+          <p className="text-sm font-bold text-accent-strong">{eyebrow}</p>
+          <h2 className="text-xl font-black text-fg sm:text-2xl">{title}</h2>
+          {description ? <p className="mt-1 text-sm text-fg-muted">{description}</p> : null}
+        </div>
+        <ChevronDown className="h-5 w-5 text-fg transition duration-200 group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-line/10 px-5 py-4 sm:px-6 sm:py-5">
+        {children}
+      </div>
+    </details>
+  );
 }
 
 export function AdminPage({
@@ -123,33 +154,33 @@ export function AdminPage({
   return (
     <div className="space-y-5">
       <Card>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-bold text-accent-strong">{t("heroEyebrow")}</p>
-            <h2 className="text-2xl font-black text-fg">{t("heroTitle")}</h2>
-            <p className="mt-1 text-sm text-fg-muted">{t("heroDescription")}</p>
-            <p className="mt-2 text-sm text-fg-soft">{t("common:labels.currentEdition", { edition: toRoman(appSettings.edition) })}</p>
+        <CollapsibleSection
+          eyebrow={t("heroEyebrow")}
+          title={t("heroTitle")}
+          description={t("heroDescription")}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="mt-2 text-sm text-fg-soft">{t("common:labels.currentEdition", { edition: toRoman(appSettings.edition) })}</p>
+            </div>
+            <button
+              disabled={busy}
+              onClick={() => runAdminAction(() => resetWeeklyRanking(admin, logs, users), t("toast.weeklyResetSuccess"))}
+              className="rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg transition hover:bg-accent-strong disabled:opacity-60"
+            >
+              {t("actions.weeklyReset")}
+            </button>
           </div>
-          <button
-            disabled={busy}
-            onClick={() => runAdminAction(() => resetWeeklyRanking(admin, logs, users), t("toast.weeklyResetSuccess"))}
-            className="rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg transition hover:bg-accent-strong disabled:opacity-60"
-          >
-            {t("actions.weeklyReset")}
-          </button>
-        </div>
+        </CollapsibleSection>
       </Card>
 
       <Card>
-        <div className="mb-4">
-          <p className="text-sm font-bold text-accent-strong">{t("settingsEyebrow")}</p>
-          <h2 className="text-2xl font-black text-fg">{t("settingsTitle")}</h2>
-          <p className="mt-1 text-sm text-fg-muted">
-            {t("settingsDescription")}
-          </p>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+        <CollapsibleSection
+          eyebrow={t("settingsEyebrow")}
+          title={t("settingsTitle")}
+          description={t("settingsDescription")}
+        >
+          <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
           <label className="flex-1">
             <span className="mb-2 block text-sm font-bold text-fg-soft">{t("cooldownLabel")}</span>
             <input
@@ -226,20 +257,36 @@ export function AdminPage({
           <p className="mt-1 text-sm text-fg-muted">Defina períodos com pontuação diferente (HH:MM).</p>
           <div className="mt-3 space-y-3">
             {bonusRanges.map((r, idx) => (
-              <div key={idx} className="grid grid-cols-3 gap-2">
-                <input className="rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" value={r.start}
-                  onChange={(e) => setBonusRanges((cur) => cur.map((v, i) => i === idx ? { ...v, start: e.target.value } : v))} />
-                <input className="rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" value={r.end}
-                  onChange={(e) => setBonusRanges((cur) => cur.map((v, i) => i === idx ? { ...v, end: e.target.value } : v))} />
-                <div className="flex gap-2">
-                  <input type="number" min={1} className="w-24 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" value={String(r.points)}
-                    onChange={(e) => setBonusRanges((cur) => cur.map((v, i) => i === idx ? { ...v, points: Number(e.target.value) } : v))} />
-                  <button className="rounded-xl bg-danger-soft/45 px-3 py-2 text-sm font-black text-danger" onClick={() => setBonusRanges((cur) => cur.filter((_, i) => i !== idx))}>Remove</button>
+              <div key={idx} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <input
+                  className="min-w-0 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none"
+                  value={r.start}
+                  onChange={(e) => setBonusRanges((cur) => cur.map((v, i) => i === idx ? { ...v, start: e.target.value } : v))}
+                />
+                <input
+                  className="min-w-0 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none"
+                  value={r.end}
+                  onChange={(e) => setBonusRanges((cur) => cur.map((v, i) => i === idx ? { ...v, end: e.target.value } : v))}
+                />
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                  <input
+                    type="number"
+                    min={1}
+                    className="w-full rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none sm:w-24"
+                    value={String(r.points)}
+                    onChange={(e) => setBonusRanges((cur) => cur.map((v, i) => i === idx ? { ...v, points: Number(e.target.value) } : v))}
+                  />
+                  <button
+                    className="rounded-xl bg-danger-soft/45 px-3 py-2 text-sm font-black text-danger"
+                    onClick={() => setBonusRanges((cur) => cur.filter((_, i) => i !== idx))}
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
             ))}
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button className="rounded-2xl bg-accent px-4 py-2 font-black text-accent-fg" onClick={() => setBonusRanges((cur) => [...cur, { start: "09:00", end: "10:00", points: appSettings.pointsPerLog }])}>
                 Add range
               </button>
@@ -249,18 +296,16 @@ export function AdminPage({
             </div>
           </div>
         </div>
+        </CollapsibleSection>
       </Card>
 
       <Card>
-        <div className="mb-4">
-          <p className="text-sm font-bold text-accent-strong">{t("requestsEyebrow")}</p>
-          <h2 className="text-2xl font-black text-fg">{t("requestsTitle")}</h2>
-          <p className="mt-1 text-sm text-fg-muted">
-            {t("requestsDescription")}
-          </p>
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-2">
+        <CollapsibleSection
+          eyebrow={t("requestsEyebrow")}
+          title={t("requestsTitle")}
+          description={t("requestsDescription")}
+        >
+          <div className="grid gap-3 lg:grid-cols-2">
           {registrationRequests.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-line/15 p-8 text-center text-fg-muted lg:col-span-2">
               {t("requestsEmpty")}
@@ -290,157 +335,155 @@ export function AdminPage({
             ))
           )}
         </div>
+        </CollapsibleSection>
       </Card>
 
       <Card>
-        <div className="mb-4">
-          <p className="text-sm font-bold text-accent-strong">{t("attemptsEyebrow")}</p>
-          <h2 className="text-2xl font-black text-fg">{t("attemptsTitle")}</h2>
-          <p className="mt-1 text-sm text-fg-muted">
-            {t("attemptsDescription")}
-          </p>
-        </div>
-
-        <div className="max-h-[420px] space-y-3 overflow-auto pr-1">
-          {registrationAttempts.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line/15 p-8 text-center text-fg-muted">
-              {t("attemptsEmpty")}
-            </div>
-          ) : (
-            registrationAttempts.slice(0, 50).map((attempt) => (
-              <div
-                key={attempt.id}
-                className="grid gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-4 md:grid-cols-[1fr_auto]"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2 py-1 text-xs font-black ${attemptClass(attempt.status)}`}>
-                      {attemptLabel(attempt.status, (key) => t(key))}
-                    </span>
-                    <span className="text-xs text-fg-muted">{formatDateTime(attempt.createdAt)}</span>
-                  </div>
-                  <p className="mt-2 truncate font-black text-fg">{attempt.email}</p>
-                  {attempt.message ? (
-                    <p className="mt-1 text-sm text-fg-muted">{attempt.message}</p>
-                  ) : null}
-                </div>
-                <div className="text-left md:text-right">
-                  {attempt.approvalCodeProvided ? (
-                    <>
-                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-fg-muted">
-                        {t("attemptCodeUsed")}
-                      </p>
-                      <p className="font-mono text-lg font-black tracking-[0.16em] text-accent-strong">
-                        {attempt.approvalCodeProvided}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-fg-muted">{t("attemptWithoutCode")}</p>
-                  )}
-                </div>
+        <CollapsibleSection
+          eyebrow={t("attemptsEyebrow")}
+          title={t("attemptsTitle")}
+          description={t("attemptsDescription")}
+        >
+          <div className="max-h-[420px] space-y-3 overflow-auto pr-1">
+            {registrationAttempts.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-line/15 p-8 text-center text-fg-muted">
+                {t("attemptsEmpty")}
               </div>
-            ))
-          )}
-        </div>
+            ) : (
+              registrationAttempts.slice(0, 50).map((attempt) => (
+                <div
+                  key={attempt.id}
+                  className="grid gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-4 md:grid-cols-[1fr_auto]"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full px-2 py-1 text-xs font-black ${attemptClass(attempt.status)}`}>
+                        {attemptLabel(attempt.status, (key) => t(key))}
+                      </span>
+                      <span className="text-xs text-fg-muted">{formatDateTime(attempt.createdAt)}</span>
+                    </div>
+                    <p className="mt-2 truncate font-black text-fg">{attempt.email}</p>
+                    {attempt.message ? (
+                      <p className="mt-1 text-sm text-fg-muted">{attempt.message}</p>
+                    ) : null}
+                  </div>
+                  <div className="text-left md:text-right">
+                    {attempt.approvalCodeProvided ? (
+                      <>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-fg-muted">
+                          {t("attemptCodeUsed")}
+                        </p>
+                        <p className="font-mono text-lg font-black tracking-[0.16em] text-accent-strong">
+                          {attempt.approvalCodeProvided}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-fg-muted">{t("attemptWithoutCode")}</p>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CollapsibleSection>
       </Card>
 
       <section className="grid gap-5 xl:grid-cols-2">
         <Card>
-          <div className="mb-4">
-            <p className="text-sm font-bold text-accent-strong">{t("manualEyebrow")}</p>
-            <h2 className="text-2xl font-black text-fg">{t("manualTitle")}</h2>
-          </div>
-          <div className="space-y-3">
-            {users.map((user) => (
-              <div key={user.uid} className="flex items-center gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-3">
-                <img src={user.avatar} alt="" className="h-10 w-10 rounded-full bg-accent-soft" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-black text-fg">{user.name}</p>
-                  <p className="text-xs text-fg-muted">{t("userPoints", { points: formatNumber(user.totalPoints) })}</p>
+          <CollapsibleSection
+            eyebrow={t("manualEyebrow")}
+            title={t("manualTitle")}
+          >
+            <div className="space-y-3">
+              {users.map((user) => (
+                <div key={user.uid} className="flex items-center gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-3">
+                  <img src={user.avatar} alt="" className="h-10 w-10 rounded-full bg-accent-soft" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-black text-fg">{user.name}</p>
+                    <p className="text-xs text-fg-muted">{t("userPoints", { points: formatNumber(user.totalPoints) })}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={busy}
+                      className="rounded-xl bg-panel px-3 py-2 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
+                      onClick={() =>
+                        runAdminAction(
+                          () => adjustUserPoints(admin, user, -appSettings.pointsPerLog),
+                          t("toast.removePoints", { points: formatNumber(appSettings.pointsPerLog) }),
+                        )
+                      }
+                    >
+                      -{formatNumber(appSettings.pointsPerLog)}
+                    </button>
+                    <button
+                      disabled={busy}
+                      className="rounded-xl bg-accent px-3 py-2 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60"
+                      onClick={() =>
+                        runAdminAction(
+                          () => adjustUserPoints(admin, user, appSettings.pointsPerLog),
+                          t("toast.addPoints", { points: formatNumber(appSettings.pointsPerLog) }),
+                        )
+                      }
+                    >
+                      +{formatNumber(appSettings.pointsPerLog)}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <input type="number" min={0} placeholder="Cooldown min" className="w-28 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" id={`cooldown-${user.uid}`} />
+                      <button className="rounded-xl bg-panel px-3 py-2 font-black text-fg" onClick={() => {
+                        const el = document.getElementById(`cooldown-${user.uid}`) as HTMLInputElement | null;
+                        const val = el?.value ? Number(el.value) : 0;
+                        if (Number.isFinite(val) && val >= 0) void setCooldownForUser(user.uid, val);
+                      }}>Set cooldown</button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                <button
-                  disabled={busy}
-                  className="rounded-xl bg-panel px-3 py-2 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
-                  onClick={() =>
-                    runAdminAction(
-                      () => adjustUserPoints(admin, user, -appSettings.pointsPerLog),
-                      t("toast.removePoints", { points: formatNumber(appSettings.pointsPerLog) }),
-                    )
-                  }
-                >
-                  -{formatNumber(appSettings.pointsPerLog)}
-                </button>
-                <button
-                  disabled={busy}
-                  className="rounded-xl bg-accent px-3 py-2 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60"
-                  onClick={() =>
-                    runAdminAction(
-                      () => adjustUserPoints(admin, user, appSettings.pointsPerLog),
-                      t("toast.addPoints", { points: formatNumber(appSettings.pointsPerLog) }),
-                    )
-                  }
-                >
-                  +{formatNumber(appSettings.pointsPerLog)}
-                </button>
-                <div className="flex items-center gap-2">
-                  <input type="number" min={0} placeholder="Cooldown min" className="w-28 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" id={`cooldown-${user.uid}`} />
-                  <button className="rounded-xl bg-panel px-3 py-2 font-black text-fg" onClick={() => {
-                    const el = document.getElementById(`cooldown-${user.uid}`) as HTMLInputElement | null;
-                    const val = el?.value ? Number(el.value) : 0;
-                    if (Number.isFinite(val) && val >= 0) void setCooldownForUser(user.uid, val);
-                  }}>Set cooldown</button>
-                </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </CollapsibleSection>
         </Card>
 
         <Card>
-          <div className="mb-4">
-            <p className="text-sm font-bold text-accent-strong">{t("recentLogsEyebrow")}</p>
-            <h2 className="text-2xl font-black text-fg">{t("recentLogsTitle")}</h2>
-          </div>
-          <div className="max-h-[620px] space-y-3 overflow-auto pr-1">
-            {logs.slice(0, 30).map((log) => (
-              <div key={log.id} className="flex items-center gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-3">
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-accent-soft/35 text-xl text-accent-strong">🧻</div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-black text-fg">
-                    {resolveUserDisplayName(usersById, log.userId, log.userName)}
-                  </p>
-                  <p className="text-xs text-fg-muted">{formatDateTime(log.createdAt)}</p>
+          <CollapsibleSection
+            eyebrow={t("recentLogsEyebrow")}
+            title={t("recentLogsTitle")}
+          >
+            <div className="max-h-[620px] space-y-3 overflow-auto pr-1">
+              {logs.slice(0, 30).map((log) => (
+                <div key={log.id} className="flex items-center gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-3">
+                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-accent-soft/35 text-xl text-accent-strong">🧻</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-black text-fg">
+                      {resolveUserDisplayName(usersById, log.userId, log.userName)}
+                    </p>
+                    <p className="text-xs text-fg-muted">{formatDateTime(log.createdAt)}</p>
+                  </div>
+                  <button
+                    disabled={busy}
+                    onClick={() => runAdminAction(() => removeLog(admin, log), t("toast.removeLog"))}
+                    className="rounded-xl bg-danger-soft/45 px-3 py-2 text-sm font-black text-danger hover:bg-danger-soft/65 disabled:opacity-60"
+                  >
+                    {t("common:actions.remove")}
+                  </button>
                 </div>
-                <button
-                  disabled={busy}
-                  onClick={() => runAdminAction(() => removeLog(admin, log), t("toast.removeLog"))}
-                  className="rounded-xl bg-danger-soft/45 px-3 py-2 text-sm font-black text-danger hover:bg-danger-soft/65 disabled:opacity-60"
-                >
-                  {t("common:actions.remove")}
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </CollapsibleSection>
         </Card>
       </section>
 
       <Card>
-        <div className="mb-4">
-          <p className="text-sm font-bold text-accent-strong">{t("auditEyebrow")}</p>
-          <h2 className="text-2xl font-black text-fg">{t("auditTitle")}</h2>
-          <p className="mt-1 text-sm text-fg-muted">
-            {t("auditDescription")}
-          </p>
-        </div>
-
-        <div className="max-h-[520px] space-y-3 overflow-auto pr-1">
-          {auditLogs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line/15 p-8 text-center text-fg-muted">
-              {t("auditEmpty")}
-            </div>
-          ) : (
-            auditLogs.slice(0, 50).map((auditLog) => (
+        <CollapsibleSection
+          eyebrow={t("auditEyebrow")}
+          title={t("auditTitle")}
+          description={t("auditDescription")}
+        >
+          <div className="max-h-[520px] space-y-3 overflow-auto pr-1">
+            {auditLogs.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-line/15 p-8 text-center text-fg-muted">
+                {t("auditEmpty")}
+              </div>
+            ) : (
+              auditLogs.slice(0, 50).map((auditLog) => (
               <div
                 key={auditLog.id}
                 className="grid gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-4 md:grid-cols-[1fr_auto]"
@@ -490,6 +533,7 @@ export function AdminPage({
             ))
           )}
         </div>
+        </CollapsibleSection>
       </Card>
     </div>
   );

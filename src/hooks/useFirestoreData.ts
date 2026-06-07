@@ -63,12 +63,12 @@ export function useUsers(enabled = true) {
   return { users, rankedUsers, loading };
 }
 
-export function useUserLogs(uid?: string) {
+export function useUserLogs(uid?: string, enabled = true) {
   const [logs, setLogs] = useState<PoopLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!uid || !isFirebaseConfigured) {
+    if (!enabled || !uid || !isFirebaseConfigured) {
       setLogs([]);
       setLoading(false);
       return;
@@ -86,7 +86,7 @@ export function useUserLogs(uid?: string) {
         setLoading(false);
       },
     );
-  }, [uid]);
+  }, [enabled, uid]);
 
   return { logs, loading };
 }

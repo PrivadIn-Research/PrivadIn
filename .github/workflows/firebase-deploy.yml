@@ -39,10 +39,16 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_DAILY_LOG_LIMIT: ${{ secrets.VITE_DAILY_LOG_LIMIT }}
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: privadin-d7ebe
-          channelId: live
+      - name: Install and build Cloud Functions
+        run: |
+          cd functions
+          npm ci
+          npm run build
+
+      - name: Deploy Firebase Hosting and Functions
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "${{ runner.temp }}/firebase-service-account.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="${{ runner.temp }}/firebase-service-account.json"
+          npx firebase-tools@15.18.0 deploy --only hosting,functions --non-interactive --project=privadin-d7ebe

@@ -7,6 +7,20 @@ export type AppView = "dashboard" | "history" | "stats" | "cuiter" | "admin" | "
 
 export type UserRole = "player" | "admin";
 
+export interface WorkSchedule {
+  horarioInicioExpediente: string;
+  horarioFimExpediente: string;
+  horarioInicioAlmoco: string;
+  horarioFimAlmoco: string;
+  timezone: string;
+}
+
+export interface PoopLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+}
+
 export interface AppUser {
   uid: string;
   name: string;
@@ -22,6 +36,11 @@ export interface AppUser {
   createdAt: Timestamp;
   firstLogAt?: Timestamp;
   lastLogAt?: Timestamp;
+  workSchedule?: WorkSchedule;
+  termsAccepted?: boolean;
+  acceptedAt?: Timestamp;
+  cooldownUntil?: Timestamp;
+  bathroomDurationMinutes?: number;
 }
 
 export interface PoopLog {
@@ -31,6 +50,10 @@ export interface PoopLog {
   createdAt: Timestamp;
   points: number;
   isWeeklyActive: boolean;
+  location?: PoopLocation;
+  timezone?: string;
+  localTime?: string;
+  durationMinutes?: number;
 }
 
 export interface CuiterPost {
@@ -129,4 +152,11 @@ export interface StatSummary {
   productiveHour: string;
   weeklyTotal: number;
   dailyAverage: number;
+}
+
+export interface SalarySummary {
+  monthlySalaryCents: number;
+  estimatedEarnedCents: number;
+  hourlyRateCents: number;
+  totalBathroomMinutes: number;
 }

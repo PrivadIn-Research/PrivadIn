@@ -90,6 +90,16 @@ async function ensureUserProfile(firebaseUser: User) {
       currentDailyStreak: 0,
       currentWeeklyStreak: 0,
       bestStreak: 0,
+      workSchedule: {
+        horarioInicioExpediente: "09:00",
+        horarioFimExpediente: "18:00",
+        horarioInicioAlmoco: "12:00",
+        horarioFimAlmoco: "13:00",
+        timezone: "America/Sao_Paulo",
+      },
+      termsAccepted: false,
+      cooldownUntil: null,
+      bathroomDurationMinutes: 10,
       createdAt: serverTimestamp(),
     });
   }

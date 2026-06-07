@@ -6,15 +6,15 @@ const DICEBEAR_URL_PREFIX = "https://api.dicebear.com/";
 export function rankUsers(users: AppUser[]): RankedUser[] {
   const overall = [...users].sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-    const aFirst = a.firstLogAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
-    const bFirst = b.firstLogAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
+    const aFirst = a.firstLogAt?.toMillis() ?? a.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
+    const bFirst = b.firstLogAt?.toMillis() ?? b.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
     return aFirst - bFirst;
   });
 
   const weekly = [...users].sort((a, b) => {
     if (b.weeklyPoints !== a.weeklyPoints) return b.weeklyPoints - a.weeklyPoints;
-    const aFirst = a.firstLogAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
-    const bFirst = b.firstLogAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
+    const aFirst = a.firstLogAt?.toMillis() ?? a.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
+    const bFirst = b.firstLogAt?.toMillis() ?? b.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
     return aFirst - bFirst;
   });
 

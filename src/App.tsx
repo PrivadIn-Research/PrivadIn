@@ -28,10 +28,13 @@ function AppContent() {
   const { user, loading } = useAuth();
   const { appSettings } = useAppSettings();
   const { users, rankedUsers } = useUsers(Boolean(user));
-  const { logs: userLogs } = useUserLogs(user?.uid);
-  const allLogs = useAllLogs(Boolean(user));
-  const { muted, toggleMuted, playFlush } = useSound();
   const [view, setView] = useState<AppView>("dashboard");
+  const { logs: userLogs } = useUserLogs(
+    user?.uid,
+    Boolean(user) && view !== "admin" && view !== "profile",
+  );
+  const allLogs = useAllLogs(view === "stats" || view === "admin");
+  const { muted, toggleMuted, playFlush } = useSound();
 
   const liveUser = useMemo(() => {
     if (!user) return null;

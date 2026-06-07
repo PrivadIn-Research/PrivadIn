@@ -59,6 +59,9 @@ export function AdminPage({
   const [busy, setBusy] = useState(false);
   const [cooldownInput, setCooldownInput] = useState(String(appSettings.cooldownMinutes));
   const [pointsInput, setPointsInput] = useState(String(appSettings.pointsPerLog));
+  const [bonusRanges, setBonusRanges] = useState<{ start: string; end: string; points: number }[]>(
+    (appSettings as any).bonusTimeRanges ?? [],
+  );
 
   useEffect(() => {
     setCooldownInput(String(appSettings.cooldownMinutes));
@@ -82,6 +85,35 @@ export function AdminPage({
       await action();
       toast.success(success);
     } catch {
+      toast.error(t("toast.genericError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveBonusRanges() {
+    setBusy(true);
+    try {
+      // dynamic import to avoid cycle
+      const { updateBonusTimeRanges } = await import("../services/settingsService");
+      await updateBonusTimeRanges(admin, bonusRanges);
+      toast.success(t("toast.bonusSaved"));
+    } catch (e) {
+      console.error(e);
+      toast.error(t("toast.genericError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setCooldownForUser(targetUid: string, minutes: number) {
+    setBusy(true);
+    try {
+      const { setUserCooldown } = await import("../services/userService");
+      await setUserCooldown(admin, targetUid, minutes);
+      toast.success(t("toast.userCooldownSaved"));
+    } catch (e) {
+      console.error(e);
       toast.error(t("toast.genericError"));
     } finally {
       setBusy(false);
@@ -186,6 +218,35 @@ export function AdminPage({
             >
               {t("actions.savePoints")}
             </button>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <h3 className="text-sm font-bold text-fg-soft">Bonus time ranges</h3>
+          <p className="mt-1 text-sm text-fg-muted">Defina períodos com pontuação diferente (HH:MM).</p>
+          <div className="mt-3 space-y-3">
+            {bonusRanges.map((r, idx) => (
+              <div key={idx} className="grid grid-cols-3 gap-2">
+                <input className="rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" value={r.start}
+                  onChange={(e) => setBonusRanges((cur) => cur.map((v, i) => i === idx ? { ...v, start: e.target.value } : v))} />
+                <input className="rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" value={r.end}
+                  onChange={(e) => setBonusRanges((cur) => cur.map((v, i) => i === idx ? { ...v, end: e.target.value } : v))} />
+                <div className="flex gap-2">
+                  <input type="number" min={1} className="w-24 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" value={String(r.points)}
+                    onChange={(e) => setBonusRanges((cur) => cur.map((v, i) => i === idx ? { ...v, points: Number(e.target.value) } : v))} />
+                  <button className="rounded-xl bg-danger-soft/45 px-3 py-2 text-sm font-black text-danger" onClick={() => setBonusRanges((cur) => cur.filter((_, i) => i !== idx))}>Remove</button>
+                </div>
+              </div>
+            ))}
+
+            <div className="flex items-center gap-2">
+              <button className="rounded-2xl bg-accent px-4 py-2 font-black text-accent-fg" onClick={() => setBonusRanges((cur) => [...cur, { start: "09:00", end: "10:00", points: appSettings.pointsPerLog }])}>
+                Add range
+              </button>
+              <button disabled={busy} className="rounded-2xl border border-line/10 bg-panel px-4 py-2 font-black text-fg" onClick={() => void saveBonusRanges()}>
+                Save ranges
+              </button>
+            </div>
           </div>
         </div>
       </Card>
@@ -297,6 +358,7 @@ export function AdminPage({
                   <p className="truncate font-black text-fg">{user.name}</p>
                   <p className="text-xs text-fg-muted">{t("userPoints", { points: formatNumber(user.totalPoints) })}</p>
                 </div>
+                <div className="flex items-center gap-2">
                 <button
                   disabled={busy}
                   className="rounded-xl bg-panel px-3 py-2 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
@@ -321,6 +383,15 @@ export function AdminPage({
                 >
                   +{formatNumber(appSettings.pointsPerLog)}
                 </button>
+                <div className="flex items-center gap-2">
+                  <input type="number" min={0} placeholder="Cooldown min" className="w-28 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" id={`cooldown-${user.uid}`} />
+                  <button className="rounded-xl bg-panel px-3 py-2 font-black text-fg" onClick={() => {
+                    const el = document.getElementById(`cooldown-${user.uid}`) as HTMLInputElement | null;
+                    const val = el?.value ? Number(el.value) : 0;
+                    if (Number.isFinite(val) && val >= 0) void setCooldownForUser(user.uid, val);
+                  }}>Set cooldown</button>
+                </div>
+                </div>
               </div>
             ))}
           </div>

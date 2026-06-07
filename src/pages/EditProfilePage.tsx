@@ -414,13 +414,24 @@ export function EditProfilePage({ user }: { user: AppUser }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
               <span className="mb-2 block text-sm font-bold text-fg-soft">Timezone</span>
-              <input
+              <select
                 className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
                 value={workSchedule.timezone}
                 onChange={(event) => setWorkSchedule((current) => ({ ...current, timezone: event.target.value }))}
-                placeholder="America/Sao_Paulo"
                 required
-              />
+              >
+                {/* Brazilian timezones */}
+                <option value="America/Sao_Paulo">America/Sao_Paulo (São Paulo)</option>
+                <option value="America/Fortaleza">America/Fortaleza (Fortaleza)</option>
+                <option value="America/Belem">America/Belem (Belém)</option>
+                <option value="America/Recife">America/Recife (Recife)</option>
+                <option value="America/Manaus">America/Manaus (Manaus)</option>
+                <option value="America/Cuiaba">America/Cuiaba (Cuiabá)</option>
+                <option value="America/Campo_Grande">America/Campo_Grande (Campo Grande)</option>
+                <option value="America/Porto_Velho">America/Porto_Velho (Porto Velho)</option>
+                <option value="America/Boa_Vista">America/Boa_Vista (Boa Vista)</option>
+                <option value="America/Rio_Branco">America/Rio_Branco (Rio Branco)</option>
+              </select>
             </label>
             <label>
               <span className="mb-2 block text-sm font-bold text-fg-soft">Minutos médios no banheiro</span>

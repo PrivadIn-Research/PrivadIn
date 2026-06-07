@@ -59,6 +59,34 @@ export function parseAppSettings(
   };
 }
 
+export type BonusTimeRange = { start: string; end: string; points: number };
+
+export async function updateBonusTimeRanges(admin: AppUser, ranges: BonusTimeRange[]) {
+  const batch = writeBatch(db);
+
+  batch.set(
+    appSettingsDocRef,
+    {
+      bonusTimeRanges: ranges,
+      updatedAt: Timestamp.now(),
+      updatedBy: admin.uid,
+    },
+    { merge: true },
+  );
+
+  batch.set(
+    doc(adminLogsRef),
+    createAuditLog({
+      action: "update_points_per_log",
+      admin,
+      // store as pointsPerLog for easier audit, not ideal but reuse existing action
+      pointsPerLog: Number(ranges[0]?.points ?? 0),
+    }),
+  );
+
+  await batch.commit();
+}
+
 export async function updateCooldownMinutes(
   admin: AppUser,
   cooldownMinutes: number,

@@ -72,6 +72,17 @@ export interface AppSettings {
   updatedBy?: string;
 }
 
+export interface BonusTimeRange {
+  start: string; // HH:MM
+  end: string; // HH:MM
+  points: number;
+}
+
+// extend AppSettings with optional bonus ranges
+export interface AppSettingsExtended extends AppSettings {
+  bonusTimeRanges?: BonusTimeRange[];
+}
+
 export type AdminAuditAction =
   | "adjust_points"
   | "remove_log"

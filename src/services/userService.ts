@@ -5,6 +5,8 @@ import i18n from "../i18n";
 import { auth, db, storage } from "./firebase";
 import type { AppUser } from "../types";
 import { NAME_MAX_LENGTH, NICKNAME_MAX_LENGTH, normalizeProfileIdentity, validateProfileIdentity } from "../utils/profileIdentity";
+import { writeBatch } from "firebase/firestore";
+import { adminLogsRef, createAuditLog } from "./poopService";
 
 export const usersRef = collection(db, "users");
 
@@ -125,4 +127,18 @@ export async function updateUserOperationalProfile(
   await updateDoc(userDoc, payload);
   const snapshot = await getDoc(userDoc);
   return snapshot.data() as AppUser;
+}
+
+export async function setUserCooldown(admin: AppUser, targetUid: string, cooldownMinutes: number) {
+  const batch = writeBatch(db);
+  const ms = Math.max(0, Math.trunc(cooldownMinutes)) * 60_000;
+  const until = Timestamp.fromMillis(Date.now() + ms);
+
+  batch.update(doc(db, "users", targetUid), { cooldownUntil: until });
+  batch.set(
+    doc(adminLogsRef),
+    createAuditLog({ action: "update_cooldown", admin, targetUser: { uid: targetUid }, cooldownMinutes: cooldownMinutes }),
+  );
+
+  await batch.commit();
 }

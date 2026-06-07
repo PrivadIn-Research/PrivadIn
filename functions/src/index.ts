@@ -179,7 +179,24 @@ export const registerPoopSecure = onCall(async (request) => {
 
     const schedule = resolveSchedule(user);
     const localTime = assertActiveWorkTime(schedule, nowDate);
-    const pointsPerLog = Math.max(1, Number(settings.pointsPerLog ?? 1));
+    let pointsPerLog = Math.max(1, Number(settings.pointsPerLog ?? 1));
+    // Check bonus time ranges (if configured) and apply the highest matching points
+    try {
+      const bonusRanges = Array.isArray(settings.bonusTimeRanges) ? settings.bonusTimeRanges : [];
+      const currentMinutes = minutesOfDay(localTime);
+      for (const r of bonusRanges) {
+        const start = typeof r.start === "string" ? r.start : "00:00";
+        const end = typeof r.end === "string" ? r.end : "00:00";
+        const pts = Number(r.points) || pointsPerLog;
+        const startMin = minutesOfDay(start);
+        const endMin = minutesOfDay(end);
+        if (isBetweenMinutes(currentMinutes, startMin, endMin)) {
+          pointsPerLog = Math.max(pointsPerLog, Math.trunc(pts));
+        }
+      }
+    } catch (e) {
+      // ignore malformed bonus ranges
+    }
     const cooldownMinutes = Math.max(0, Number(settings.cooldownMinutes ?? 15));
     const durationMinutes = Math.max(1, Math.min(180, Number(user.bathroomDurationMinutes ?? 10)));
     const nextCooldown = Timestamp.fromMillis(now.toMillis() + cooldownMinutes * 60_000);

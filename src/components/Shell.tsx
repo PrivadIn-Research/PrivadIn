@@ -54,48 +54,52 @@ export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, c
 
           <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
             <img className="h-9 w-9 rounded-full bg-accent-soft sm:hidden" src={currentUser?.avatar} alt="" />
-            <label
-              className="flex items-center gap-1.5 rounded-xl border border-line/10 bg-panel px-2.5 py-2 text-fg-soft md:hidden"
-              title={t("common:language.switcherLabel")}
-            >
-              <Languages size={15} className="text-accent-strong" />
-              <span className="sr-only">{t("common:language.label")}</span>
-              <select
-                className="max-w-[42vw] bg-transparent text-xs font-semibold outline-none"
-                aria-label={t("common:language.switcherLabel")}
-                value={language}
-                onChange={(event) => {
-                  void changeLanguage(event.target.value);
-                }}
-              >
-                {options.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-panel-strong text-fg">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label
-              className="hidden items-center gap-2 rounded-xl border border-line/10 bg-panel px-3 py-2 text-fg-soft md:flex"
-              title={t("common:language.switcherLabel")}
-            >
-              <Languages size={16} className="text-accent-strong" />
-              <span className="sr-only">{t("common:language.label")}</span>
-              <select
-                className="bg-transparent text-sm font-semibold outline-none"
-                aria-label={t("common:language.switcherLabel")}
-                value={language}
-                onChange={(event) => {
-                  void changeLanguage(event.target.value);
-                }}
-              >
-                {options.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-panel-strong text-fg">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {view === "profile" && (
+              <>
+                <label
+                  className="flex items-center gap-1.5 rounded-xl border border-line/10 bg-panel px-2.5 py-2 text-fg-soft md:hidden"
+                  title={t("common:language.switcherLabel")}
+                >
+                  <Languages size={15} className="text-accent-strong" />
+                  <span className="sr-only">{t("common:language.label")}</span>
+                  <select
+                    className="max-w-[42vw] bg-transparent text-xs font-semibold outline-none"
+                    aria-label={t("common:language.switcherLabel")}
+                    value={language}
+                    onChange={(event) => {
+                      void changeLanguage(event.target.value);
+                    }}
+                  >
+                    {options.map((option) => (
+                      <option key={option.value} value={option.value} className="bg-panel-strong text-fg">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label
+                  className="hidden items-center gap-2 rounded-xl border border-line/10 bg-panel px-3 py-2 text-fg-soft md:flex"
+                  title={t("common:language.switcherLabel")}
+                >
+                  <Languages size={16} className="text-accent-strong" />
+                  <span className="sr-only">{t("common:language.label")}</span>
+                  <select
+                    className="bg-transparent text-sm font-semibold outline-none"
+                    aria-label={t("common:language.switcherLabel")}
+                    value={language}
+                    onChange={(event) => {
+                      void changeLanguage(event.target.value);
+                    }}
+                  >
+                    {options.map((option) => (
+                      <option key={option.value} value={option.value} className="bg-panel-strong text-fg">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
             <button
               className="rounded-xl border border-line/10 bg-panel p-2.5 text-fg-soft transition hover:bg-panel-strong hover:text-fg sm:p-3"
               onClick={onToggleMuted}
@@ -139,13 +143,15 @@ export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, c
                 <p className="text-xs text-fg-muted">{currentUser?.role === "admin" ? t("common:roles.admin") : t("common:roles.player")}</p>
               </div>
             </div>
-            <button
-              className="rounded-xl border border-line/10 bg-panel p-2.5 text-fg-soft transition hover:bg-danger-soft/70 hover:text-danger sm:p-3"
-              onClick={logout}
-              title={t("shell:logout")}
-            >
-              <LogOut size={18} />
-            </button>
+            {view === "profile" && (
+              <button
+                className="rounded-xl border border-line/10 bg-panel p-2.5 text-fg-soft transition hover:bg-danger-soft/70 hover:text-danger sm:p-3"
+                onClick={logout}
+                title={t("shell:logout")}
+              >
+                <LogOut size={18} />
+              </button>
+            )}
           </div>
         </header>
 

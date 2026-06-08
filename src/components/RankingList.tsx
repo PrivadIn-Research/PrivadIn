@@ -1,6 +1,7 @@
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
 import type { RankedUser } from "../types";
+import { AvatarImage } from "./AvatarImage";
 import { medalFor, titleFor } from "../utils/ranking";
 import { formatNumber } from "../utils/format";
 
@@ -35,7 +36,7 @@ export function RankingList({
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-canvas-elevated/80 text-xl text-fg sm:h-12 sm:w-12 sm:rounded-2xl sm:text-2xl">
               {medalFor(rank)}
             </div>
-            <img src={user.avatar} alt="" className="h-10 w-10 rounded-full bg-accent-soft sm:h-11 sm:w-11" />
+            <AvatarImage avatar={user.avatar} email={user.email} name={user.name} className="h-10 w-10 sm:h-11 sm:w-11" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="truncate text-sm font-black text-fg sm:text-base">{user.name}</p>

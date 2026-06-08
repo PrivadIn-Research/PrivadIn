@@ -27,6 +27,7 @@ export interface AppUser {
   nickname?: string;
   email: string;
   avatar: string;
+  avatarStoragePath?: string | null;
   role: UserRole;
   totalPoints: number;
   weeklyPoints: number;

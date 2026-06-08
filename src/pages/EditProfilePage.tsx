@@ -1,28 +1,41 @@
-import { useEffect, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import { AvatarCropper } from "../components/AvatarCropper";
+import { AvatarImage } from "../components/AvatarImage";
 import { Card } from "../components/Card";
 import { useAuth } from "../contexts/AuthContext";
-import type { AppUser } from "../types";
-import { avatarFor, canLoadDicebearUrl, isValidDicebearUrl } from "../utils/ranking";
-import { NAME_MAX_LENGTH, NICKNAME_MAX_LENGTH, normalizeProfileIdentity, validateProfileIdentity } from "../utils/profileIdentity";
-import { updateUserOperationalProfile, updateUserProfile } from "../services/userService";
-import { checkForUpdates, getCurrentVersion, triggerPWAUpdate } from "../services/updateService";
 import { getSalarySummary, saveEncryptedMonthlySalary } from "../services/secureFunctionsService";
-import type { SalarySummary, WorkSchedule } from "../types";
+import { deleteAvatarFile, updateUserOperationalProfile, updateUserProfile, uploadAvatarFile } from "../services/userService";
+import { checkForUpdates, getCurrentVersion, triggerPWAUpdate } from "../services/updateService";
+import type { AppUser, SalarySummary, WorkSchedule } from "../types";
+import {
+  AVATAR_ACCEPTED_TYPES,
+  validateAvatarFile,
+} from "../utils/avatarUpload";
+import { NAME_MAX_LENGTH, NICKNAME_MAX_LENGTH, normalizeProfileIdentity, validateProfileIdentity } from "../utils/profileIdentity";
+import { avatarFor, canLoadDicebearUrl, isValidDicebearUrl } from "../utils/ranking";
 
 type AvatarStatus = "idle" | "checking" | "valid" | "invalid";
+type AvatarAction = "keep" | "manual" | "upload" | "default";
 type UpdateCheckStatus = "idle" | "checking" | "available" | "unavailable" | "error";
 
 export function EditProfilePage({ user }: { user: AppUser }) {
   const { t } = useTranslation("profile");
   const { refreshProfile } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(user.name);
   const [nickname, setNickname] = useState(user.nickname ?? "");
-  const [avatar, setAvatar] = useState(user.avatar ?? avatarFor(user.name, user.email));
+  const [manualAvatarUrl, setManualAvatarUrl] = useState(
+    isValidDicebearUrl(user.avatar ?? "") ? user.avatar : avatarFor(user.name, user.email),
+  );
   const [avatarStatus, setAvatarStatus] = useState<AvatarStatus>(
     isValidDicebearUrl(user.avatar ?? "") ? "valid" : "idle",
   );
+  const [avatarAction, setAvatarAction] = useState<AvatarAction>("keep");
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
+  const [cropperImageUrl, setCropperImageUrl] = useState<string | null>(null);
+  const [uploadedAvatarPreviewUrl, setUploadedAvatarPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [operationalBusy, setOperationalBusy] = useState(false);
   const [salaryBusy, setSalaryBusy] = useState(false);
@@ -40,19 +53,43 @@ export function EditProfilePage({ user }: { user: AppUser }) {
   const [monthlySalary, setMonthlySalary] = useState("");
   const [salarySummary, setSalarySummary] = useState<SalarySummary | null>(null);
 
-  const hasValidAvatar = isValidDicebearUrl(avatar);
   const nameError = validateProfileIdentity(name, { required: true, maxLength: NAME_MAX_LENGTH });
   const nicknameError = validateProfileIdentity(nickname, { maxLength: NICKNAME_MAX_LENGTH });
-  const previewAvatar = avatarStatus === "valid" && hasValidAvatar
-    ? avatar.trim()
-    : user.avatar || avatarFor(user.name, user.email);
   const currentVersion = getCurrentVersion();
+  const generatedDefaultAvatar = useMemo(() => {
+    const normalizedName = normalizeProfileIdentity(name);
+    return avatarFor(normalizedName || user.name, user.email);
+  }, [name, user.email, user.name]);
+  const hasValidManualAvatar = isValidDicebearUrl(manualAvatarUrl);
+  const previewAvatar = avatarAction === "upload" && uploadedAvatarPreviewUrl
+    ? uploadedAvatarPreviewUrl
+    : avatarAction === "manual" && hasValidManualAvatar
+      ? manualAvatarUrl.trim()
+      : avatarAction === "default"
+        ? generatedDefaultAvatar
+        : user.avatar || generatedDefaultAvatar;
+  const isSaveDisabled =
+    busy ||
+    Boolean(nameError) ||
+    Boolean(nicknameError) ||
+    (avatarAction === "manual" && !hasValidManualAvatar) ||
+    (avatarAction === "upload" && !pendingAvatarFile);
 
   useEffect(() => {
     setName(user.name);
     setNickname(user.nickname ?? "");
-    setAvatar(user.avatar ?? avatarFor(user.name, user.email));
+    setManualAvatarUrl(isValidDicebearUrl(user.avatar ?? "") ? user.avatar : avatarFor(user.name, user.email));
     setAvatarStatus(isValidDicebearUrl(user.avatar ?? "") ? "valid" : "idle");
+    setAvatarAction("keep");
+    setPendingAvatarFile(null);
+    if (cropperImageUrl) {
+      URL.revokeObjectURL(cropperImageUrl);
+      setCropperImageUrl(null);
+    }
+    if (uploadedAvatarPreviewUrl) {
+      URL.revokeObjectURL(uploadedAvatarPreviewUrl);
+      setUploadedAvatarPreviewUrl(null);
+    }
     setWorkSchedule({
       horarioInicioExpediente: user.workSchedule?.horarioInicioExpediente ?? "09:00",
       horarioFimExpediente: user.workSchedule?.horarioFimExpediente ?? "18:00",
@@ -62,14 +99,15 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     });
     setTermsAccepted(user.termsAccepted === true);
     setBathroomDurationMinutes(user.bathroomDurationMinutes ?? 10);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }, [user.uid, user.name, user.nickname, user.avatar, user.email]);
 
   useEffect(() => {
     void refreshSalarySummary();
   }, [user.uid]);
 
-  // Auto-trigger PWA update after a short delay when update is available
-  // Cleanup timeout if component unmounts before it fires
   useEffect(() => {
     if (updateCheckStatus === "available") {
       const timeout = setTimeout(() => {
@@ -80,8 +118,34 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     }
   }, [updateCheckStatus]);
 
-  async function validateAvatar(showToast = false) {
-    const candidate = avatar.trim();
+  useEffect(() => {
+    return () => {
+      if (cropperImageUrl) {
+        URL.revokeObjectURL(cropperImageUrl);
+      }
+      if (uploadedAvatarPreviewUrl) {
+        URL.revokeObjectURL(uploadedAvatarPreviewUrl);
+      }
+    };
+  }, [cropperImageUrl, uploadedAvatarPreviewUrl]);
+
+  function clearPendingUpload() {
+    setPendingAvatarFile(null);
+    if (uploadedAvatarPreviewUrl) {
+      URL.revokeObjectURL(uploadedAvatarPreviewUrl);
+      setUploadedAvatarPreviewUrl(null);
+    }
+  }
+
+  function replaceCropperImageUrl(nextUrl: string | null) {
+    if (cropperImageUrl && cropperImageUrl !== nextUrl) {
+      URL.revokeObjectURL(cropperImageUrl);
+    }
+    setCropperImageUrl(nextUrl);
+  }
+
+  async function validateManualAvatar(showToast = false, candidateUrl?: string) {
+    const candidate = (candidateUrl ?? manualAvatarUrl).trim();
 
     if (!isValidDicebearUrl(candidate)) {
       setAvatarStatus("invalid");
@@ -94,7 +158,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     setAvatarStatus("checking");
     const canLoad = await canLoadDicebearUrl(candidate);
 
-    if (avatar.trim() !== candidate) {
+    if ((candidateUrl ?? manualAvatarUrl).trim() !== candidate) {
       return false;
     }
 
@@ -107,7 +171,61 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     return canLoad;
   }
 
-  async function handleSubmit(event: React.FormEvent) {
+  async function handleAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const validationError = validateAvatarFile(file);
+    if (validationError === "invalid_type") {
+      toast.error(t("avatarFileTypeError"));
+      event.target.value = "";
+      return;
+    }
+
+    if (validationError === "too_large") {
+      toast.error(t("avatarFileSizeError"));
+      event.target.value = "";
+      return;
+    }
+
+    clearPendingUpload();
+    const nextUrl = URL.createObjectURL(file);
+    replaceCropperImageUrl(nextUrl);
+  }
+
+  async function handleApplyAvatarCrop(file: File) {
+    try {
+      const previewUrl = URL.createObjectURL(file);
+      if (uploadedAvatarPreviewUrl) {
+        URL.revokeObjectURL(uploadedAvatarPreviewUrl);
+      }
+      setPendingAvatarFile(file);
+      setUploadedAvatarPreviewUrl(previewUrl);
+      setAvatarAction("upload");
+      replaceCropperImageUrl(null);
+      toast.success(t("avatarUploadReadyToast"));
+    } catch (error) {
+      console.error(error);
+      toast.error(t("avatarCropError"));
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
+  function handleUseDefaultAvatar() {
+    clearPendingUpload();
+    replaceCropperImageUrl(null);
+    setManualAvatarUrl(generatedDefaultAvatar);
+    setAvatarStatus("valid");
+    setAvatarAction("default");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (nameError) {
       toast.error(
@@ -129,22 +247,70 @@ export function EditProfilePage({ user }: { user: AppUser }) {
       return;
     }
 
-    if (!(await validateAvatar(true))) {
-      return;
-    }
-
     setBusy(true);
+
+    let uploadedStoragePath: string | null = null;
+
     try {
-      await updateUserProfile(user.uid, {
+      const updates: { name?: string; nickname?: string; avatar?: string; avatarStoragePath?: string | null } = {
         name: normalizeProfileIdentity(name),
         nickname: normalizeProfileIdentity(nickname),
-        avatar: avatar.trim(),
-      });
+      };
+
+      if (avatarAction === "manual") {
+        const isValid = await validateManualAvatar(true);
+        if (!isValid) {
+          setBusy(false);
+          return;
+        }
+        updates.avatar = manualAvatarUrl.trim();
+        updates.avatarStoragePath = null;
+      }
+
+      if (avatarAction === "default") {
+        updates.avatar = generatedDefaultAvatar;
+        updates.avatarStoragePath = null;
+      }
+
+      if (avatarAction === "upload") {
+        if (!pendingAvatarFile) {
+          toast.error(t("avatarCropMissing"));
+          setBusy(false);
+          return;
+        }
+
+        const uploadResult = await uploadAvatarFile(user.uid, pendingAvatarFile);
+        uploadedStoragePath = uploadResult.path;
+        updates.avatar = uploadResult.url;
+        updates.avatarStoragePath = uploadResult.path;
+      }
+
+      await updateUserProfile(user.uid, updates);
+
+      if (user.avatarStoragePath && user.avatarStoragePath !== updates.avatarStoragePath) {
+        try {
+          await deleteAvatarFile(user.avatarStoragePath);
+        } catch (cleanupError) {
+          console.error(cleanupError);
+        }
+      }
+
       await refreshProfile();
+      clearPendingUpload();
+      replaceCropperImageUrl(null);
+      setAvatarAction("keep");
+      setAvatarStatus(updates.avatar && isValidDicebearUrl(updates.avatar) ? "valid" : "idle");
       toast.success(t("updateSuccess"));
-    } catch (e) {
-      console.error(e);
-      toast.error(e instanceof Error ? e.message : t("updateError"));
+    } catch (error) {
+      if (uploadedStoragePath) {
+        try {
+          await deleteAvatarFile(uploadedStoragePath);
+        } catch (cleanupError) {
+          console.error(cleanupError);
+        }
+      }
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : t("updateError"));
     } finally {
       setBusy(false);
     }
@@ -165,7 +331,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     }).format(value / 100);
   }
 
-  async function handleOperationalSubmit(event: React.FormEvent) {
+  async function handleOperationalSubmit(event: FormEvent) {
     event.preventDefault();
     setOperationalBusy(true);
     try {
@@ -184,7 +350,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     }
   }
 
-  async function handleSalarySubmit(event: React.FormEvent) {
+  async function handleSalarySubmit(event: FormEvent) {
     event.preventDefault();
     const normalized = monthlySalary.replace(/\./g, "").replace(",", ".");
     const monthlySalaryCents = Math.round(Number(normalized) * 100);
@@ -228,8 +394,8 @@ export function EditProfilePage({ user }: { user: AppUser }) {
         setUpdateCheckStatus("unavailable");
         toast.success(t("updateNotAvailable"));
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
       setUpdateCheckStatus("error");
       toast.error(t("updateCheckError"));
     }
@@ -244,13 +410,13 @@ export function EditProfilePage({ user }: { user: AppUser }) {
           <p className="mt-1 text-sm text-fg-muted">{t("description")}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-4">
+        <form onSubmit={handleSubmit} className="grid gap-5">
           <label>
             <span className="mb-2 block text-sm font-bold text-fg-soft">{t("name")}</span>
             <input
               className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(event) => setName(event.target.value)}
               maxLength={NAME_MAX_LENGTH}
               required
             />
@@ -272,7 +438,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
             <input
               className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none placeholder:text-fg-muted"
               value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              onChange={(event) => setNickname(event.target.value)}
               placeholder={t("nicknamePlaceholder")}
               maxLength={NICKNAME_MAX_LENGTH}
             />
@@ -285,74 +451,138 @@ export function EditProfilePage({ user }: { user: AppUser }) {
             </p>
           </label>
 
-          <label>
-            <span className="mb-2 block text-sm font-bold text-fg-soft">{t("avatarLabel")}</span>
-            <input
-              className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
-              type="url"
-              value={avatar}
-              onChange={(e) => {
-                const nextValue = e.target.value;
-                setAvatar(nextValue);
-                setAvatarStatus(
-                  isValidDicebearUrl(nextValue)
-                    ? nextValue.trim() === (user.avatar ?? "").trim()
-                      ? "valid"
-                      : "idle"
-                    : "invalid",
-                );
-              }}
-              onBlur={() => {
-                if (isValidDicebearUrl(avatar)) {
-                  void validateAvatar();
-                }
-              }}
-              placeholder="https://api.dicebear.com/9.x/croodles/svg?seed=Liliana"
-              required
-            />
-            <p className="mt-2 text-xs text-fg-muted">
-              {t("avatarHint")}
-              {" "}
-              <a
-                className="font-semibold text-accent-strong underline underline-offset-2"
-                href="https://www.dicebear.com/playground/"
-                target="_blank"
-                rel="noreferrer"
-              >
-                https://www.dicebear.com/playground/
-              </a>
-              .
-            </p>
-            {!hasValidAvatar ? (
-              <p className="mt-1 text-xs font-semibold text-danger">
-                {t("avatarInvalid")}
-              </p>
-            ) : avatarStatus === "checking" ? (
-              <p className="mt-1 text-xs font-semibold text-info">
-                {t("avatarChecking")}
-              </p>
-            ) : avatarStatus === "valid" ? (
-              <p className="mt-1 text-xs font-semibold text-success">
-                {t("avatarValid")}
-              </p>
-            ) : avatarStatus === "invalid" ? (
-              <p className="mt-1 text-xs font-semibold text-danger">
-                {t("avatarLoadError")}
-              </p>
-            ) : null}
-          </label>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="space-y-4">
+              <div className="rounded-3xl border border-line/10 bg-panel-strong/40 p-4 sm:p-5">
+                <div className="mb-4">
+                  <p className="text-sm font-bold text-accent-strong">{t("avatarUploadLabel")}</p>
+                  <p className="mt-1 text-sm text-fg-muted">{t("avatarUploadHint")}</p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-2xl bg-accent px-4 py-3 text-sm font-black text-accent-fg transition hover:bg-accent-strong"
+                  >
+                    {user.avatarStoragePath || pendingAvatarFile ? t("avatarUploadReplaceAction") : t("avatarUploadAction")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUseDefaultAvatar}
+                    className="rounded-2xl border border-line/10 bg-panel px-4 py-3 text-sm font-black text-fg transition hover:bg-panel-strong"
+                  >
+                    {t("avatarResetAction")}
+                  </button>
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={AVATAR_ACCEPTED_TYPES.join(",")}
+                  className="hidden"
+                  onChange={(event) => void handleAvatarFileChange(event)}
+                />
+
+                <p className="mt-3 text-xs text-fg-muted">{t("avatarUploadTypes")}</p>
+
+                {avatarAction === "upload" && pendingAvatarFile ? (
+                  <p className="mt-2 text-xs font-semibold text-success">{t("avatarUploadReady")}</p>
+                ) : avatarAction === "default" ? (
+                  <p className="mt-2 text-xs font-semibold text-info">{t("avatarDefaultReady")}</p>
+                ) : null}
+              </div>
+
+              {cropperImageUrl ? (
+                <AvatarCropper
+                  imageUrl={cropperImageUrl}
+                  onCancel={() => {
+                    replaceCropperImageUrl(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = "";
+                    }
+                  }}
+                  onApply={handleApplyAvatarCrop}
+                />
+              ) : null}
+
+              <label className="block rounded-3xl border border-line/10 bg-panel-strong/40 p-4 sm:p-5">
+                <span className="mb-2 block text-sm font-bold text-fg-soft">{t("avatarLabel")}</span>
+                <input
+                  className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
+                  type="url"
+                  value={manualAvatarUrl}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    clearPendingUpload();
+                    replaceCropperImageUrl(null);
+                    setManualAvatarUrl(nextValue);
+                    setAvatarAction("manual");
+                    setAvatarStatus(isValidDicebearUrl(nextValue) ? "idle" : "invalid");
+                  }}
+                  onBlur={() => {
+                    if (avatarAction === "manual" && isValidDicebearUrl(manualAvatarUrl)) {
+                      void validateManualAvatar();
+                    }
+                  }}
+                  placeholder="https://api.dicebear.com/9.x/croodles/svg?seed=Liliana"
+                />
+                <p className="mt-2 text-xs text-fg-muted">
+                  {t("avatarHint")}{" "}
+                  <a
+                    className="font-semibold text-accent-strong underline underline-offset-2"
+                    href="https://www.dicebear.com/playground/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    https://www.dicebear.com/playground/
+                  </a>
+                  .
+                </p>
+                {avatarAction === "manual" && !hasValidManualAvatar ? (
+                  <p className="mt-1 text-xs font-semibold text-danger">{t("avatarInvalid")}</p>
+                ) : avatarAction === "manual" && avatarStatus === "checking" ? (
+                  <p className="mt-1 text-xs font-semibold text-info">{t("avatarChecking")}</p>
+                ) : avatarAction === "manual" && avatarStatus === "valid" ? (
+                  <p className="mt-1 text-xs font-semibold text-success">{t("avatarValid")}</p>
+                ) : avatarAction === "manual" && avatarStatus === "invalid" ? (
+                  <p className="mt-1 text-xs font-semibold text-danger">{t("avatarLoadError")}</p>
+                ) : null}
+              </label>
+            </div>
+
+            <div className="rounded-3xl border border-line/10 bg-panel-strong/40 p-4 sm:p-5">
+              <p className="font-black text-fg">{t("avatarCurrent")}</p>
+              <p className="mt-1 text-sm text-fg-muted">{t("avatarCurrentHint")}</p>
+              <div className="mt-4 flex flex-col items-center gap-3 text-center">
+                {avatarAction === "upload" && uploadedAvatarPreviewUrl ? (
+                  <img src={uploadedAvatarPreviewUrl} alt="avatar" className="h-24 w-24 rounded-full object-cover" />
+                ) : (
+                  <AvatarImage avatar={previewAvatar} email={user.email} name={name || user.name} className="h-24 w-24" />
+                )}
+                <span className="rounded-full bg-panel px-3 py-1 text-xs font-semibold text-accent-strong">
+                  {avatarAction === "upload"
+                    ? t("avatarSourceUpload")
+                    : avatarAction === "manual"
+                      ? t("avatarSourceManual")
+                      : avatarAction === "default"
+                        ? t("avatarSourceDefault")
+                        : t("avatarSourceCurrent")}
+                </span>
+              </div>
+            </div>
+          </div>
 
           <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-            <img src={previewAvatar} alt="avatar" className="h-16 w-16 rounded-full" />
             <div className="w-full flex-1">
-              <p className="font-black text-fg">{t("avatarCurrent")}</p>
-              <p className="text-sm text-fg-muted">{t("avatarCurrentHint")}</p>
+              <p className="font-black text-fg">{t("avatarSaveTitle")}</p>
+              <p className="text-sm text-fg-muted">{t("avatarSaveHint")}</p>
             </div>
             <button
-              disabled={busy || !hasValidAvatar || Boolean(nameError) || Boolean(nicknameError)}
+              disabled={isSaveDisabled}
               className="w-full rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60 sm:w-auto"
             >
-              {t("save")}
+              {busy ? t("avatarSaving") : t("save")}
             </button>
           </div>
         </form>
@@ -420,7 +650,6 @@ export function EditProfilePage({ user }: { user: AppUser }) {
                 onChange={(event) => setWorkSchedule((current) => ({ ...current, timezone: event.target.value }))}
                 required
               >
-                {/* Brazilian timezones */}
                 <option value="America/Sao_Paulo">America/Sao_Paulo (São Paulo)</option>
                 <option value="America/Fortaleza">America/Fortaleza (Fortaleza)</option>
                 <option value="America/Belem">America/Belem (Belém)</option>

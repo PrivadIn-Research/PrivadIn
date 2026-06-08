@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useAppLanguage } from "../hooks/useAppLanguage";
 import { useTheme } from "../hooks/useTheme";
 import { clsx } from "clsx";
+import { AvatarImage } from "./AvatarImage";
 
 interface ShellProps {
   currentUser: AppUser | null;
@@ -53,7 +54,7 @@ export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, c
           </button>
 
           <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
-            <img className="h-9 w-9 rounded-full bg-accent-soft sm:hidden" src={currentUser?.avatar} alt="" />
+            {currentUser ? <AvatarImage className="h-9 w-9 sm:hidden" avatar={currentUser.avatar} email={currentUser.email} name={currentUser.name} /> : null}
             {view === "profile" && (
               <>
                 <label
@@ -137,7 +138,7 @@ export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, c
               })}
             </div>
             <div className="hidden items-center gap-3 rounded-xl border border-line/10 bg-panel px-3 py-2 sm:flex">
-              <img className="h-8 w-8 rounded-full bg-accent-soft" src={currentUser?.avatar} alt="" />
+              {currentUser ? <AvatarImage className="h-8 w-8" avatar={currentUser.avatar} email={currentUser.email} name={currentUser.name} /> : null}
               <div className="leading-tight">
                 <p className="text-sm font-bold text-fg">{currentUser?.name}</p>
                 <p className="text-xs text-fg-muted">{currentUser?.role === "admin" ? t("common:roles.admin") : t("common:roles.player")}</p>

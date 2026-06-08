@@ -1,6 +1,6 @@
 import { updateProfile } from "firebase/auth";
 import { Timestamp, collection, doc, getDoc, getDocs, query, updateDoc, where, limit } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import i18n from "../i18n";
 import { auth, db, storage } from "./firebase";
 import type { AppUser } from "../types";
@@ -34,12 +34,17 @@ export async function uploadAvatarFile(firebaseUid: string, file: File) {
   const storageRef = ref(storage, path);
   await uploadBytes(storageRef, file);
   const url = await getDownloadURL(storageRef);
-  return url;
+  return { path, url };
+}
+
+export async function deleteAvatarFile(path?: string | null) {
+  if (!path) return;
+  await deleteObject(ref(storage, path));
 }
 
 export async function updateUserProfile(
   firebaseUid: string,
-  updates: { name?: string; nickname?: string; avatar?: string },
+  updates: { name?: string; nickname?: string; avatar?: string; avatarStoragePath?: string | null },
 ) {
   const userDoc = doc(db, "users", firebaseUid);
   const payload: Partial<AppUser> = {};
@@ -82,6 +87,7 @@ export async function updateUserProfile(
     payload.nickname = normalizedNickname;
   }
   if (typeof updates.avatar === "string") payload.avatar = updates.avatar.trim();
+  if ("avatarStoragePath" in updates) payload.avatarStoragePath = updates.avatarStoragePath ?? null;
 
   if (Object.keys(payload).length > 0) {
     await updateDoc(userDoc, payload);

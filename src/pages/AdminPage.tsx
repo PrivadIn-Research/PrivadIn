@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { AvatarImage } from "../components/AvatarImage";
 import { Card } from "../components/Card";
 import type {
   AdminAuditLog,
@@ -397,7 +398,7 @@ export function AdminPage({
             <div className="space-y-3">
               {users.map((user) => (
                 <div key={user.uid} className="flex items-center gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-3">
-                  <img src={user.avatar} alt="" className="h-10 w-10 rounded-full bg-accent-soft" />
+                  <AvatarImage avatar={user.avatar} email={user.email} name={user.name} className="h-10 w-10" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-black text-fg">{user.name}</p>
                     <p className="text-xs text-fg-muted">{t("userPoints", { points: formatNumber(user.totalPoints) })}</p>

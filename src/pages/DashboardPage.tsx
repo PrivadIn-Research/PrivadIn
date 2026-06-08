@@ -11,6 +11,7 @@ import { formatNumber } from "../utils/format";
 import { toRoman } from "../utils/roman";
 import { requestCurrentLocation } from "../services/locationService";
 import { registerPoopWithBackendValidation } from "../services/secureFunctionsService";
+import { createWeeklyRankingShareFile, RANKING_LIMIT } from "../utils/weeklyRankingShare";
 
 export function DashboardPage({
   user,
@@ -39,6 +40,7 @@ export function DashboardPage({
   const cooldownSeconds = Math.max(logCooldownSeconds, userCooldownSeconds);
   const formattedPointsPerLog = formatNumber(pointsPerLog);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isSharingRanking, setIsSharingRanking] = useState(false);
   const isOnCooldown = cooldownSeconds > 0;
   const cooldownWarningMessage = t("cooldownWarning");
 
@@ -68,35 +70,51 @@ export function DashboardPage({
   }
 
   async function handleShareRanking() {
-    const rankingText = rankedUsers
-      .sort((a, b) => a.rank - b.rank)
-      .map((ranked) =>
-        t("shareLine", {
-          rank: ranked.rank,
-          name: ranked.name,
-          nickname: ranked.nickname?.trim() ? t("shareNickname", { nickname: ranked.nickname.trim() }) : "",
-          points: formatNumber(ranked.totalPoints),
-        }),
-      )
-      .join("\n");
-    const text = t("shareText", {
-      edition: toRoman(edition),
-      ranking: rankingText || t("shareEmpty"),
-    });
+    if (isSharingRanking) return;
+
+    setIsSharingRanking(true);
 
     try {
-      if (navigator.share) {
+      const editionLabel = t("common:labels.currentEdition", { edition: toRoman(edition) });
+      const file = await createWeeklyRankingShareFile({
+        currentUid: user.uid,
+        currentUserLabel: t("shareCurrentUser"),
+        editionLabel,
+        emptyLabel: t("shareEmpty"),
+        footerLabel: t("shareFooter", { count: Math.min(rankedUsers.length, RANKING_LIMIT) }),
+        fileName: `privadin-weekly-ranking-${toRoman(edition).toLowerCase()}.png`,
+        pointsLabel: t("common:labels.pointsShort"),
+        title: t("weeklyTitle"),
+        users: rankedUsers,
+      });
+
+      const canShareFiles = navigator.canShare ? navigator.canShare({ files: [file] }) : true;
+
+      if (navigator.share && canShareFiles) {
         await navigator.share({
           title: t("shareTitle"),
-          text,
+          files: [file],
         });
         return;
       }
 
-      await navigator.clipboard.writeText(text);
-      toast.success(t("shareCopied"));
-    } catch {
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(t("shareDownloaded", { count: Math.min(rankedUsers.length, RANKING_LIMIT) }));
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
       toast.error(t("shareError"));
+    } finally {
+      setIsSharingRanking(false);
     }
   }
 
@@ -153,10 +171,13 @@ export function DashboardPage({
           <RankingList users={rankedUsers} mode="weekly" currentUid={user.uid} />
           <button
               onClick={handleShareRanking}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-accent-soft/35 px-4 py-3 text-sm font-black text-accent-strong transition hover:bg-accent hover:text-accent-fg sm:w-auto"
+              disabled={isSharingRanking}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-accent-soft/35 px-4 py-3 text-sm font-black text-accent-strong transition sm:w-auto ${
+                isSharingRanking ? "cursor-wait opacity-70" : "hover:bg-accent hover:text-accent-fg"
+              }`}
               title={t("shareTitle")}
             >
-              <Share2 size={18} />
+              {isSharingRanking ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
               {t("shareAction")}
             </button>
         </Card>

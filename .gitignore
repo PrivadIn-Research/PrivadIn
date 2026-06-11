@@ -8,8 +8,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-functions/.env
-functions/.env.*
 dist
 dist-ssr
 *.local

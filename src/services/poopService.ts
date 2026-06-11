@@ -15,7 +15,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { AdminAuditAction, AppUser, PoopLog } from "../types";
+import type { AdminAuditAction, AppUser, BonusTimeRange, PoopLocation, PoopLog } from "../types";
 import {
   DAILY_LIMIT,
   countToday,
@@ -23,6 +23,12 @@ import {
   calculateDailyStreak,
   calculateWeeklyStreak,
 } from "../utils/date";
+import {
+  assertActiveWorkTime,
+  isBetweenMinutes,
+  minutesOfDay,
+  resolveWorkSchedule,
+} from "../utils/workSchedule";
 import i18n from "../i18n";
 
 export const usersRef = collection(db, "users");
@@ -82,6 +88,134 @@ export function allLogsQuery() {
 
 export function adminAuditLogsQuery() {
   return query(adminLogsRef, orderBy("createdAt", "desc"));
+}
+
+function resolvePointsPerLog(
+  settings: Record<string, unknown> | undefined,
+  localTime: string,
+  fallback: number,
+) {
+  let pointsPerLog = Math.max(1, Number(settings?.pointsPerLog ?? fallback));
+  const bonusRanges = Array.isArray(settings?.bonusTimeRanges)
+    ? (settings.bonusTimeRanges as BonusTimeRange[])
+    : [];
+  const currentMinutes = minutesOfDay(localTime);
+
+  for (const range of bonusRanges) {
+    const start = typeof range.start === "string" ? range.start : "00:00";
+    const end = typeof range.end === "string" ? range.end : "00:00";
+    const points = Number(range.points) || pointsPerLog;
+    if (isBetweenMinutes(currentMinutes, minutesOfDay(start), minutesOfDay(end))) {
+      pointsPerLog = Math.max(pointsPerLog, Math.trunc(points));
+    }
+  }
+
+  return pointsPerLog;
+}
+
+function assertLocation(location: PoopLocation) {
+  const latitude = Number(location.latitude);
+  const longitude = Number(location.longitude);
+  const accuracy = location.accuracy == null ? null : Number(location.accuracy);
+
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    throw new Error("Latitude inválida.");
+  }
+
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new Error("Longitude inválida.");
+  }
+
+  return {
+    latitude,
+    longitude,
+    accuracy: Number.isFinite(accuracy) ? accuracy : null,
+  };
+}
+
+export async function registerPoopWithValidation(
+  user: AppUser,
+  userLogs: PoopLog[],
+  location: PoopLocation,
+  cooldownMinutes: number,
+  pointsPerLog: number,
+) {
+  if (user.termsAccepted !== true) {
+    throw new Error("Aceite os termos de uso e privacidade antes de registrar.");
+  }
+
+  const cooldown = getCooldownSeconds(userLogs, cooldownMinutes);
+  if (cooldown > 0) {
+    throw new Error(i18n.t("services:poop.cooldown", { count: Math.ceil(cooldown / 60) }));
+  }
+
+  if (user.cooldownUntil && user.cooldownUntil.toMillis() > Date.now()) {
+    throw new Error(
+      `Usuário em cooldown até ${user.cooldownUntil.toDate().toLocaleString("pt-BR")}.`,
+    );
+  }
+
+  if (countToday(userLogs) >= DAILY_LIMIT) {
+    throw new Error(i18n.t("services:poop.dailyLimit", { count: DAILY_LIMIT }));
+  }
+
+  const validatedLocation = assertLocation(location);
+  const schedule = resolveWorkSchedule(user.workSchedule);
+  const now = Timestamp.now();
+  const nowDate = now.toDate();
+  const localTime = assertActiveWorkTime(schedule, nowDate);
+  const userRef = doc(db, "users", user.uid);
+  const settingsRef = doc(db, "app_settings", APP_SETTINGS_DOC_ID);
+
+  await runTransaction(db, async (transaction) => {
+    const [userSnapshot, settingsSnapshot] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(settingsRef),
+    ]);
+    const currentUser = userSnapshot.data() as AppUser | undefined;
+    if (!currentUser) {
+      throw new Error("Perfil do usuário não encontrado.");
+    }
+
+    const settings = settingsSnapshot.data();
+    const resolvedPoints = resolvePointsPerLog(settings, localTime, pointsPerLog);
+    const resolvedCooldownMinutes = Math.max(0, Number(settings?.cooldownMinutes ?? cooldownMinutes));
+    const durationMinutes = Math.max(1, Math.min(180, Number(currentUser.bathroomDurationMinutes ?? 10)));
+    const nextCooldown = Timestamp.fromMillis(now.toMillis() + resolvedCooldownMinutes * 60_000);
+    const nextLogs = [
+      {
+        id: "pending",
+        userId: user.uid,
+        userName: currentUser.name,
+        createdAt: now,
+        points: resolvedPoints,
+        isWeeklyActive: true,
+      },
+      ...userLogs,
+    ];
+
+    transaction.set(doc(logsRef), {
+      userId: user.uid,
+      userName: currentUser.name,
+      createdAt: now,
+      points: resolvedPoints,
+      isWeeklyActive: true,
+      location: validatedLocation,
+      timezone: schedule.timezone,
+      localTime,
+      durationMinutes,
+    });
+    transaction.update(userRef, {
+      totalPoints: increment(resolvedPoints),
+      weeklyPoints: increment(resolvedPoints),
+      firstLogAt: currentUser.firstLogAt ?? now,
+      lastLogAt: now,
+      cooldownUntil: nextCooldown,
+      currentDailyStreak: calculateDailyStreak(nextLogs),
+      currentWeeklyStreak: calculateWeeklyStreak(nextLogs),
+      bestStreak: Math.max(currentUser.bestStreak ?? 0, calculateDailyStreak(nextLogs)),
+    });
+  });
 }
 
 export async function registerPoop(

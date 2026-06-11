@@ -8,7 +8,7 @@ import { avatarFor, canLoadDicebearUrl, isValidDicebearUrl } from "../utils/rank
 import { NAME_MAX_LENGTH, NICKNAME_MAX_LENGTH, normalizeProfileIdentity, validateProfileIdentity } from "../utils/profileIdentity";
 import { updateUserOperationalProfile, updateUserProfile } from "../services/userService";
 import { checkForUpdates, getCurrentVersion, triggerPWAUpdate } from "../services/updateService";
-import { getSalarySummary, saveEncryptedMonthlySalary } from "../services/secureFunctionsService";
+import { getSalarySummary, saveEncryptedMonthlySalary } from "../services/salaryService";
 import type { SalarySummary, WorkSchedule } from "../types";
 
 type AvatarStatus = "idle" | "checking" | "valid" | "invalid";
@@ -152,7 +152,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
 
   async function refreshSalarySummary() {
     try {
-      setSalarySummary(await getSalarySummary());
+      setSalarySummary(await getSalarySummary(user));
     } catch (error) {
       console.error(error);
     }
@@ -363,7 +363,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
           <p className="text-sm font-bold text-accent-strong">Expediente e privacidade</p>
           <h2 className="text-2xl font-black text-fg">Regras para registrar</h2>
           <p className="mt-1 text-sm text-fg-muted">
-            O backend bloqueia registros fora do expediente, durante o almoço, sem termos aceitos ou sem localização.
+            O app bloqueia registros fora do expediente, durante o almoço, sem termos aceitos ou sem localização.
           </p>
         </div>
 
@@ -480,7 +480,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
           <p className="text-sm font-bold text-accent-strong">Salário seguro</p>
           <h2 className="text-2xl font-black text-fg">Ganhos no banheiro</h2>
           <p className="mt-1 text-sm text-fg-muted">
-            O salário é criptografado no backend com AES-256-GCM antes de ser salvo no Firestore.
+            O salário é criptografado no navegador com AES-256-GCM antes de ser salvo no Firestore.
           </p>
         </div>
 

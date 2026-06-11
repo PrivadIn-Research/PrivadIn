@@ -10,8 +10,10 @@ import { countThisWeek, formatDateTime, formatHour, getCooldownSeconds, getLastL
 import { formatNumber } from "../utils/format";
 import { toRoman } from "../utils/roman";
 import { requestCurrentLocation } from "../services/locationService";
+import { registerPoopWithValidation } from "../services/poopService";
 import { registerPoopWithBackendValidation } from "../services/secureFunctionsService";
 import { createWeeklyRankingShareFile, RANKING_LIMIT } from "../utils/weeklyRankingShare";
+
 
 export function DashboardPage({
   user,
@@ -56,7 +58,7 @@ export function DashboardPage({
     const previousRank = currentRank?.rank ?? rankedUsers.length;
     try {
       const location = await requestCurrentLocation();
-      await registerPoopWithBackendValidation(location);
+      await registerPoopWithValidation(user, userLogs, location, cooldownMinutes, pointsPerLog);
       onPlaySound();
       toast.success(t("registerSuccess"));
       if ((currentRank?.rank ?? previousRank) <= previousRank) {

@@ -47,14 +47,26 @@ service cloud.firestore {
         && request.resource.data.userId is string;
     }
 
+    function validPlayerPoopLogCreate() {
+      return validPoopLogCreate()
+        && isOwner(request.resource.data.userId)
+        && request.resource.data.location.latitude is number
+        && request.resource.data.location.longitude is number
+        && request.resource.data.timezone is string
+        && request.resource.data.localTime is string
+        && request.resource.data.durationMinutes is int
+        && request.resource.data.durationMinutes >= 1
+        && request.resource.data.durationMinutes <= 180;
+    }
+
     match /poop_logs/{logId} {
       allow read: if signedIn();
-      allow create: if isAdmin() && validPoopLogCreate();
+      allow create: if validPlayerPoopLogCreate() || (isAdmin() && validPoopLogCreate());
       allow update, delete: if isAdmin();
     }
 
     match /user_private/{userId} {
-      allow read, write: if false;
+      allow read, write: if isOwner(userId);
     }
 
     match /admin_audit_logs/{auditLogId} {

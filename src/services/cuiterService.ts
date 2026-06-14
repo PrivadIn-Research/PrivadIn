@@ -11,7 +11,7 @@ import {
   where,
   type DocumentData,
   type QueryDocumentSnapshot,
-} from "firebase/firestore";
+} from "@firebase/firestore";
 import { db } from "./firebase";
 import i18n from "../i18n";
 import type { AppUser, CuiterPost } from "../types";

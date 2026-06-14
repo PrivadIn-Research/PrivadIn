@@ -12,9 +12,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   type User,
-} from "firebase/auth";
-import { FirebaseError } from "firebase/app";
-import { Timestamp, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+} from "@firebase/auth";
+import { FirebaseError } from "@firebase/app";
+import { Timestamp, doc, getDoc, serverTimestamp, setDoc } from "@firebase/firestore";
 import i18n from "../i18n";
 import { auth, db, isFirebaseConfigured } from "../services/firebase";
 import type { AppUser, RegistrationRequest } from "../types";

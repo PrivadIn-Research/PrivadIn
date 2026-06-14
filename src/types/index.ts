@@ -1,4 +1,4 @@
-import type { Timestamp } from "firebase/firestore";
+import type { Timestamp } from "@firebase/firestore";
 
 export type AppLanguage = "pt-BR" | "en-US" | "es-ES" | "zh-Hans" | "ar" | "jam-JM" | "pap-CW";
 export type AppTheme = "light" | "dark";

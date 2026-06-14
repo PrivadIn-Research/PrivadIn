@@ -1,4 +1,4 @@
-import { Timestamp, doc, writeBatch } from "firebase/firestore";
+import { Timestamp, doc, writeBatch } from "@firebase/firestore";
 import type { AppSettings, AppUser } from "../types";
 import { db } from "./firebase";
 import { adminLogsRef, createAuditLog } from "./poopService";

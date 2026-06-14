@@ -1,5 +1,5 @@
 export const NAME_MAX_LENGTH = 25;
-export const NICKNAME_MAX_LENGTH = 15;
+export const NICKNAME_MAX_LENGTH = 32;
 
 const PROFILE_IDENTITY_ALLOWED_PATTERN = /^[\p{L}\p{N}@#$%&*()!._+\- ]+$/u;
 const PROFILE_IDENTITY_DISALLOWED_PATTERN = /[\p{C}\t\n\r\f\v\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/u;

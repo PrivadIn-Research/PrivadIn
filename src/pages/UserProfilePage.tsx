@@ -119,12 +119,12 @@ export function UserProfilePage({
 
         <div className="grid gap-5 md:grid-cols-2">
           {/* Chave de Moedas (ID) */}
-          <div className="rounded-2xl border border-line/10 bg-panel-strong/40 p-4 sm:p-5">
+          <div className="min-w-0 rounded-2xl border border-line/10 bg-panel-strong/40 p-4 sm:p-5">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-fg-muted">
               {t("profile:coinKey")}
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-xl bg-field px-3 py-2 text-sm text-fg-soft font-mono">
+              <code className="block min-w-0 flex-1 truncate rounded-xl bg-field px-3 py-2 text-sm text-fg-soft font-mono">
                 {profileUser.uid}
               </code>
               <button

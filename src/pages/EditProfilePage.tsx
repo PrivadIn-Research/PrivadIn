@@ -10,7 +10,7 @@ import { db } from "../services/firebase";
 import { competitionResetAuditLogsQuery } from "../services/poopService";
 import { deleteAvatarFile, updateUserOperationalProfile, updateUserProfile, uploadAvatarFile } from "../services/userService";
 import { checkForUpdates, getCurrentVersion, triggerPWAUpdate } from "../services/updateService";
-import type { AdminAuditLog, AppSettings, AppUser, PoopLog, SalarySummary, WorkSchedule } from "../types";
+import type { AdminAuditLog, AppSettings, AppUser, AppView, PoopLog, SalarySummary, WorkSchedule } from "../types";
 import {
   AVATAR_ACCEPTED_TYPES,
   validateAvatarFile,
@@ -38,13 +38,14 @@ function saveLocalMonthlySalaryCents(uid: string, monthlySalaryCents: number) {
   window.localStorage.setItem(salaryStorageKey(uid), String(Math.round(monthlySalaryCents)));
 }
 
-export function EditProfilePage({ user, appSettings }: { user: AppUser; appSettings: AppSettings }) {
+export function EditProfilePage({ user, appSettings, setView }: { user: AppUser; appSettings: AppSettings; setView?: (view: AppView) => void }) {
   const { t } = useTranslation("profile");
   const { refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const avatarFileInputId = `avatar-file-${user.uid}`;
   const [name, setName] = useState(user.name);
   const [nickname, setNickname] = useState(user.nickname ?? "");
+  const [bio, setBio] = useState(user.bio ?? "");
   const [manualAvatarUrl, setManualAvatarUrl] = useState(
     isValidDicebearUrl(user.avatar ?? "") ? user.avatar : avatarFor(user.name, user.email),
   );
@@ -97,6 +98,7 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
   useEffect(() => {
     setName(user.name);
     setNickname(user.nickname ?? "");
+    setBio(user.bio ?? "");
     setManualAvatarUrl(isValidDicebearUrl(user.avatar ?? "") ? user.avatar : avatarFor(user.name, user.email));
     setAvatarStatus(isValidDicebearUrl(user.avatar ?? "") ? "valid" : "idle");
     setAvatarAction("keep");
@@ -121,7 +123,7 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [user.avatar, user.email, user.name, user.nickname, user.uid, user.workSchedule, user.bathroomDurationMinutes]);
+  }, [user.avatar, user.email, user.name, user.nickname, user.uid, user.workSchedule, user.bathroomDurationMinutes, user.bio]);
 
   useEffect(() => {
     void refreshSalarySummary();
@@ -261,9 +263,10 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
     let uploadedStoragePath: string | null = null;
 
     try {
-      const updates: { name?: string; nickname?: string; avatar?: string; avatarStoragePath?: string | null } = {
+      const updates: { name?: string; nickname?: string; avatar?: string; avatarStoragePath?: string | null; bio?: string } = {
         name: normalizeProfileIdentity(name),
         nickname: normalizeProfileIdentity(nickname),
+        bio: bio.trim(),
       };
 
       if (avatarAction === "manual") {
@@ -310,6 +313,7 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
       setAvatarAction("keep");
       setAvatarStatus(isValidDicebearUrl(updates.avatar ?? user.avatar ?? "") ? "valid" : "idle");
       toast.success(t("updateSuccess"));
+      if (setView) setView("profile");
     } catch (error) {
       if (uploadedStoragePath) {
         try {
@@ -486,6 +490,20 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
             </p>
           </label>
 
+          <label>
+            <span className="mb-2 block text-sm font-bold text-fg-soft">{t("bio")}</span>
+            <textarea
+              className="w-full min-h-24 rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none placeholder:text-fg-muted resize-none focus:border-accent/35 focus:ring"
+              value={bio}
+              onChange={(event) => setBio(event.target.value.slice(0, 160))}
+              placeholder={t("bioPlaceholder")}
+              maxLength={160}
+            />
+            <p className="mt-2 text-xs text-fg-muted">
+              {t("charsCount", { count: bio.length, max: 160 })}
+            </p>
+          </label>
+
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
             <div className="space-y-4">
               <div className="rounded-3xl border border-line/10 bg-panel-strong/40 p-4 sm:p-5">
@@ -613,12 +631,23 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
               <p className="font-black text-fg">{t("avatarSaveTitle")}</p>
               <p className="text-sm text-fg-muted">{t("avatarSaveHint")}</p>
             </div>
-            <button
-              disabled={isSaveDisabled}
-              className="w-full rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60 sm:w-auto"
-            >
-              {busy ? t("avatarSaving") : t("save")}
-            </button>
+            <div className="flex w-full gap-3 sm:w-auto">
+              {setView ? (
+                <button
+                  type="button"
+                  onClick={() => setView("profile")}
+                  className="w-full rounded-2xl border border-line/10 bg-panel px-5 py-3 font-black text-fg hover:bg-panel-strong sm:w-auto"
+                >
+                  {t("common:actions.cancel")}
+                </button>
+              ) : null}
+              <button
+                disabled={isSaveDisabled}
+                className="w-full rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60 sm:w-auto"
+              >
+                {busy ? t("avatarSaving") : t("save")}
+              </button>
+            </div>
           </div>
         </form>
       </Card>

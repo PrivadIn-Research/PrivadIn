@@ -46,6 +46,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Painel",
         history: "Histórico",
         stats: "Estatísticas",
@@ -260,6 +261,16 @@ export const resources = {
       updateAvailable: "Nova versão disponível! Atualize para {{newVersion}}.",
       updateNotAvailable: "Você está na versão mais recente.",
       updateCheckError: "Erro ao verificar atualizações. Tente novamente.",
+      bio: "Bio",
+      bioPlaceholder: "Escreva uma descrição curta sobre você...",
+      publicTitle: "Perfil do Usuário",
+      publicEyebrow: "Informações públicas",
+      coinKey: "Chave de moedas (ID)",
+      recentPosts: "Posts recentes no Cuiter",
+      noBio: "Nenhuma biografia fornecida.",
+      noPosts: "Este usuário ainda não publicou no Cuiter.",
+      editProfileButton: "Editar Perfil",
+      backButton: "Voltar",
     },
     cuiter: {
       loadUserPostsError: "Não foi possível contar seus posts do Cuiter.",
@@ -476,6 +487,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Dashboard",
         history: "History",
         stats: "Stats",
@@ -688,6 +700,16 @@ export const resources = {
       updateAvailable: "New version available! Update to {{newVersion}}.",
       updateNotAvailable: "You are running the latest version.",
       updateCheckError: "Error checking for updates. Please try again.",
+      bio: "Bio",
+      bioPlaceholder: "Tell us a bit about yourself...",
+      publicTitle: "User Profile",
+      publicEyebrow: "Public information",
+      coinKey: "Coin key (ID)",
+      recentPosts: "Recent posts on Cuiter",
+      noBio: "No bio provided.",
+      noPosts: "This user hasn't posted on Cuiter yet.",
+      editProfileButton: "Edit Profile",
+      backButton: "Back",
     },
     cuiter: {
       loadUserPostsError: "Couldn't count your Cuiter posts.",
@@ -903,6 +925,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Panel",
         history: "Historial",
         stats: "Estadísticas",
@@ -1328,6 +1351,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "面板",
         history: "历史",
         stats: "统计",
@@ -1750,6 +1774,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "اللوحة",
         history: "السجل",
         stats: "الإحصاءات",
@@ -2175,6 +2200,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Dashboard",
         history: "Histri",
         stats: "Stats",
@@ -2595,6 +2621,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Panel",
         history: "Historial",
         stats: "Estadístika",

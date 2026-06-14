@@ -112,12 +112,6 @@ i18n.addResources("pt-BR", "admin", {
   },
 });
 
-i18n.addResources("pt-BR", "shell", {
-  nav: {
-    poopcoins: "Poopcoins",
-  },
-});
-
 i18n.addResources("pt-BR", "cuiter", {
   unlockInfo: "Voce precisa de pelo menos 1 Poopcoin para publicar no Cuiter.",
   credits_one: "{{chars}} caracteres restantes · {{count}} Poopcoin disponivel",
@@ -220,12 +214,6 @@ i18n.addResources("en-US", "admin", {
     adjust_poopcoins: "Poopcoins adjustment",
     reverse_poopcoin_transaction: "Poopcoins reversal",
     migrate_poopcoins: "Poopcoins migration",
-  },
-});
-
-i18n.addResources("en-US", "shell", {
-  nav: {
-    poopcoins: "Poopcoins",
   },
 });
 

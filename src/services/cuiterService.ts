@@ -126,3 +126,14 @@ export async function createCuiterPost(user: AppUser, message: string) {
     poopcoinTransactionHash,
   } as CuiterPost;
 }
+
+export async function fetchUserCuiterPosts(userId: string, limitCount = 10) {
+  const q = query(
+    cuiterPostsRef,
+    where("userId", "==", userId),
+    orderBy("createdAt", "desc"),
+    limit(limitCount)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(mapPost);
+}

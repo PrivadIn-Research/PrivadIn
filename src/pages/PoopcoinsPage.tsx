@@ -68,16 +68,8 @@ export function PoopcoinsPage({
   const [sending, setSending] = useState(false);
   const usersById = useMemo(() => new Map(users.map((candidate) => [candidate.uid, candidate])), [users]);
   const balance = Number(user.poopcoinBalance ?? 0);
-  const normalizedAmount = normalizePoopcoinAmount(Number(amount));
   const recipient = usersById.get(recipientUid.trim());
-  const canTransfer =
-    !sending &&
-    normalizedAmount > 0 &&
-    recipientUid.trim().length > 0 &&
-    Boolean(recipient) &&
-    recipient?.isActive !== false &&
-    recipientUid.trim() !== user.uid &&
-    balance >= normalizedAmount;
+  const canTransfer = !sending;
 
   async function copyUserId() {
     try {
@@ -89,15 +81,43 @@ export function PoopcoinsPage({
   }
 
   async function handleTransfer() {
-    if (!canTransfer) return;
+    const trimmedRecipientUid = recipientUid.trim();
+    if (!trimmedRecipientUid) {
+      toast.error("ID do destinatário é obrigatório.");
+      return;
+    }
+    if (trimmedRecipientUid === user.uid) {
+      toast.error("Você não pode transferir Poopcoins para si mesmo.");
+      return;
+    }
+    const targetRecipient = usersById.get(trimmedRecipientUid);
+    if (!targetRecipient || targetRecipient.isActive === false) {
+      toast.error("Nenhum participante ativo encontrado com este ID.");
+      return;
+    }
+    let transferAmount = Number(amount);
+    if (isNaN(transferAmount) || transferAmount <= 0) {
+      toast.error("A quantidade deve ser um número maior que zero.");
+      return;
+    }
+    if (!Number.isInteger(transferAmount)) {
+      toast.error("A quantidade deve ser um número inteiro.");
+      return;
+    }
+    transferAmount = normalizePoopcoinAmount(transferAmount);
+    if (balance < transferAmount) {
+      toast.error(`Saldo insuficiente. Você tem ${balance} Poopcoins.`);
+      return;
+    }
+
     setSending(true);
     try {
-      await transferPoopcoins(user, recipientUid, normalizedAmount);
+      await transferPoopcoins(user, trimmedRecipientUid, transferAmount);
       setRecipientUid("");
       setAmount("1");
       toast.success("Poopcoins transferidos.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Nao foi possivel transferir.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível transferir.");
     } finally {
       setSending(false);
     }
@@ -118,10 +138,10 @@ export function PoopcoinsPage({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-line/10 bg-field p-4">
+          <div className="min-w-0 rounded-2xl border border-line/10 bg-field p-4">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-fg-muted">Seu ID</p>
             <div className="mt-2 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-xl bg-panel px-3 py-2 text-sm text-fg-soft">
+              <code className="block min-w-0 flex-1 truncate rounded-xl bg-panel px-3 py-2 text-sm text-fg-soft">
                 {user.uid}
               </code>
               <button
@@ -145,7 +165,7 @@ export function PoopcoinsPage({
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px_auto] lg:items-end">
-          <label>
+          <label className="block min-w-0">
             <span className="mb-2 block text-sm font-bold text-fg-soft">ID do destinatario</span>
             <input
               className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
@@ -153,17 +173,9 @@ export function PoopcoinsPage({
               onChange={(event) => setRecipientUid(event.target.value)}
               placeholder="Cole o UID do usuario"
             />
-            {recipientUid.trim() && recipient ? (
-              <div className="mt-2 flex items-center gap-2 text-xs text-fg-muted">
-                <AvatarImage avatar={recipient.avatar} email={recipient.email} name={recipient.name} className="h-6 w-6" />
-                <span>{recipient.nickname?.trim() || recipient.name}</span>
-              </div>
-            ) : recipientUid.trim() ? (
-              <p className="mt-2 text-xs font-semibold text-warning">Nenhum participante ativo encontrado com este ID.</p>
-            ) : null}
           </label>
 
-          <label>
+          <label className="block">
             <span className="mb-2 block text-sm font-bold text-fg-soft">Quantidade</span>
             <input
               className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
@@ -185,6 +197,15 @@ export function PoopcoinsPage({
             {sending ? "Enviando..." : "Enviar"}
           </button>
         </div>
+
+        {recipientUid.trim() && recipient ? (
+          <div className="mt-2 flex items-center gap-2 text-xs text-fg-muted">
+            <AvatarImage avatar={recipient.avatar} email={recipient.email} name={recipient.name} className="h-6 w-6" />
+            <span>{recipient.nickname?.trim() || recipient.name}</span>
+          </div>
+        ) : recipientUid.trim() ? (
+          <p className="mt-2 text-xs font-semibold text-warning">Nenhum participante ativo encontrado com este ID.</p>
+        ) : null}
       </Card>
 
       <Card>

@@ -1,11 +1,9 @@
-const MB = 1024 * 1024;
-
-export const AVATAR_MAX_FILE_SIZE = MB;
 export const AVATAR_ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export const AVATAR_CROP_FRAME_SIZE = 256;
 export const AVATAR_OUTPUT_SIZE = 512;
 
-export type AvatarFileValidationError = "invalid_type" | "too_large";
+// Removemos o erro "too_large"
+export type AvatarFileValidationError = "invalid_type";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -29,10 +27,7 @@ export function validateAvatarFile(file: File): AvatarFileValidationError | null
     return "invalid_type";
   }
 
-  if (file.size > AVATAR_MAX_FILE_SIZE) {
-    return "too_large";
-  }
-
+  // Validação de tamanho removida daqui
   return null;
 }
 
@@ -102,14 +97,9 @@ export async function buildCroppedAvatarFile({
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(image, sourceX, sourceY, cropSize, cropSize, 0, 0, outputSize, outputSize);
 
-  const qualities = [0.92, 0.84, 0.76, 0.68, 0.6, 0.52];
-
-  for (const quality of qualities) {
-    const blob = await canvasToBlob(canvas, quality);
-    if (blob.size <= AVATAR_MAX_FILE_SIZE) {
-      return new File([blob], `avatar-${Date.now()}.jpg`, { type: "image/jpeg" });
-    }
-  }
-
-  throw new Error("Avatar image exceeds max size after processing.");
+  // Loop de redução de qualidade removido
+  // Gera o blob direto com 92% de qualidade de compressão (ótimo para web) e retorna
+  const blob = await canvasToBlob(canvas, 0.92);
+  
+  return new File([blob], `avatar-${Date.now()}.jpg`, { type: "image/jpeg" });
 }

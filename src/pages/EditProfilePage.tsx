@@ -1,11 +1,12 @@
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { AvatarCropper } from "../components/AvatarCropper";
 import { AvatarImage } from "../components/AvatarImage";
 import { Card } from "../components/Card";
 import { useAuth } from "../contexts/AuthContext";
-import { getSalarySummary, saveEncryptedMonthlySalary } from "../services/secureFunctionsService";
+import { db } from "../services/firebase";
 import { deleteAvatarFile, updateUserOperationalProfile, updateUserProfile, uploadAvatarFile } from "../services/userService";
 import { checkForUpdates, getCurrentVersion, triggerPWAUpdate } from "../services/updateService";
 import type { AppUser, SalarySummary, WorkSchedule } from "../types";
@@ -15,10 +16,23 @@ import {
 } from "../utils/avatarUpload";
 import { NAME_MAX_LENGTH, NICKNAME_MAX_LENGTH, normalizeProfileIdentity, validateProfileIdentity } from "../utils/profileIdentity";
 import { avatarFor, canLoadDicebearUrl, isValidDicebearUrl } from "../utils/ranking";
+import { dailyWorkMinutes, resolveWorkSchedule } from "../utils/workSchedule";
 
 type AvatarStatus = "idle" | "checking" | "valid" | "invalid";
 type AvatarAction = "keep" | "manual" | "upload" | "default";
 type UpdateCheckStatus = "idle" | "checking" | "available" | "unavailable" | "error";
+
+const salaryStorageKey = (uid: string) => `privadin:monthlySalaryCents:${uid}`;
+
+function getLocalMonthlySalaryCents(uid: string) {
+  const rawValue = window.localStorage.getItem(salaryStorageKey(uid));
+  const value = rawValue === null ? 0 : Number(rawValue);
+  return Number.isFinite(value) && value >= 0 ? Math.round(value) : 0;
+}
+
+function saveLocalMonthlySalaryCents(uid: string, monthlySalaryCents: number) {
+  window.localStorage.setItem(salaryStorageKey(uid), String(Math.round(monthlySalaryCents)));
+}
 
 export function EditProfilePage({ user }: { user: AppUser }) {
   const { t } = useTranslation("profile");
@@ -318,7 +332,23 @@ export function EditProfilePage({ user }: { user: AppUser }) {
 
   async function refreshSalarySummary() {
     try {
-      setSalarySummary(await getSalarySummary());
+      const durationFallback = Math.max(1, Math.min(180, Number(user.bathroomDurationMinutes ?? 10)));
+      const logsSnapshot = await getDocs(query(collection(db, "poop_logs"), where("userId", "==", user.uid)));
+      const totalBathroomMinutes = logsSnapshot.docs.reduce((sum, logDoc) => {
+        const duration = Number(logDoc.data().durationMinutes ?? durationFallback);
+        return sum + (Number.isFinite(duration) ? duration : durationFallback);
+      }, 0);
+      const monthlySalaryCents = getLocalMonthlySalaryCents(user.uid);
+      const monthlyWorkMinutes = dailyWorkMinutes(resolveWorkSchedule(user.workSchedule)) * 22;
+      const hourlyRateCents = monthlySalaryCents / Math.max(1, monthlyWorkMinutes / 60);
+      const estimatedEarnedCents = Math.round((monthlySalaryCents / monthlyWorkMinutes) * totalBathroomMinutes);
+
+      setSalarySummary({
+        monthlySalaryCents,
+        estimatedEarnedCents,
+        hourlyRateCents: Math.round(hourlyRateCents),
+        totalBathroomMinutes,
+      });
     } catch (error) {
       console.error(error);
     }
@@ -361,13 +391,13 @@ export function EditProfilePage({ user }: { user: AppUser }) {
 
     setSalaryBusy(true);
     try {
-      await saveEncryptedMonthlySalary(monthlySalaryCents);
+      saveLocalMonthlySalaryCents(user.uid, monthlySalaryCents);
       await refreshSalarySummary();
       setMonthlySalary("");
-      toast.success("Salario salvo criptografado.");
+      toast.success("Salario salvo neste dispositivo.");
     } catch (error) {
       console.error(error);
-      toast.error("Nao foi possivel salvar o salario criptografado.");
+      toast.error("Nao foi possivel salvar o salario neste dispositivo.");
     } finally {
       setSalaryBusy(false);
     }
@@ -706,10 +736,10 @@ export function EditProfilePage({ user }: { user: AppUser }) {
 
       <Card>
         <div className="mb-4">
-          <p className="text-sm font-bold text-accent-strong">Salário seguro</p>
+          <p className="text-sm font-bold text-accent-strong">Salário local</p>
           <h2 className="text-2xl font-black text-fg">Ganhos no banheiro</h2>
           <p className="mt-1 text-sm text-fg-muted">
-            O salário é criptografado no backend com AES-256-GCM antes de ser salvo no Firestore.
+            O salário fica salvo somente no localStorage deste navegador.
           </p>
         </div>
 
@@ -728,7 +758,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
             disabled={salaryBusy}
             className="self-end rounded-2xl bg-panel-strong px-5 py-3 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
           >
-            {salaryBusy ? "Criptografando..." : "Salvar salário"}
+            {salaryBusy ? "Salvando..." : "Salvar salário"}
           </button>
         </form>
 

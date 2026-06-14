@@ -46,6 +46,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Painel",
         history: "Histórico",
         stats: "Estatísticas",
@@ -476,6 +477,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Dashboard",
         history: "History",
         stats: "Stats",
@@ -903,6 +905,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Panel",
         history: "Historial",
         stats: "Estadísticas",
@@ -1328,6 +1331,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "面板",
         history: "历史",
         stats: "统计",
@@ -1750,6 +1754,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "اللوحة",
         history: "السجل",
         stats: "الإحصاءات",
@@ -2175,6 +2180,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Dashboard",
         history: "Histri",
         stats: "Stats",
@@ -2595,6 +2601,7 @@ export const resources = {
     },
     shell: {
       nav: {
+        poopcoins: "PoopCoin",
         dashboard: "Panel",
         history: "Historial",
         stats: "Estadístika",

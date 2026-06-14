@@ -13,11 +13,13 @@ const DEFAULT_POINTS_PER_LOG = 2000;
 const MIN_POINTS_PER_LOG = 1;
 const MAX_POINTS_PER_LOG = 100000;
 const DEFAULT_EDITION = 17;
+export const MAX_COMPETITION_ANNOUNCEMENT_LENGTH = 280;
 
 export const defaultAppSettings: AppSettings = {
   cooldownMinutes: DEFAULT_COOLDOWN_MINUTES,
   pointsPerLog: DEFAULT_POINTS_PER_LOG,
   edition: DEFAULT_EDITION,
+  competitionAnnouncement: "",
 };
 
 export function normalizeCooldownMinutes(value: number) {
@@ -56,6 +58,7 @@ export function parseAppSettings(
       Number(data?.pointsPerLog ?? DEFAULT_POINTS_PER_LOG),
     ),
     edition: normalizeEdition(Number(data?.edition ?? DEFAULT_EDITION)),
+    competitionAnnouncement: String(data?.competitionAnnouncement ?? "").trim().slice(0, MAX_COMPETITION_ANNOUNCEMENT_LENGTH),
   };
 }
 
@@ -139,6 +142,37 @@ export async function updatePointsPerLog(
       action: "update_points_per_log",
       admin,
       pointsPerLog: normalizedPoints,
+    }),
+  );
+
+  await batch.commit();
+}
+
+export function normalizeCompetitionAnnouncement(value: string) {
+  return value.trim().slice(0, MAX_COMPETITION_ANNOUNCEMENT_LENGTH);
+}
+
+export async function updateCompetitionAnnouncement(admin: AppUser, announcement: string) {
+  const normalizedAnnouncement = normalizeCompetitionAnnouncement(announcement);
+  const batch = writeBatch(db);
+
+  batch.set(
+    appSettingsDocRef,
+    {
+      competitionAnnouncement: normalizedAnnouncement,
+      competitionAnnouncementUpdatedAt: Timestamp.now(),
+      competitionAnnouncementUpdatedBy: admin.uid,
+      updatedAt: Timestamp.now(),
+      updatedBy: admin.uid,
+    },
+    { merge: true },
+  );
+
+  batch.set(
+    doc(adminLogsRef),
+    createAuditLog({
+      action: "update_competition_announcement",
+      admin,
     }),
   );
 

@@ -3,6 +3,7 @@ import { KeyRound, Lock, Mail, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 import { Trans, useTranslation } from "react-i18next";
 import { APP_VERSION } from "../constants/app";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { useAuth } from "../contexts/AuthContext";
 import { isFirebaseConfigured } from "../services/firebase";
 import { AuthLoginError, loginErrorMessage } from "../utils/authErrors";
@@ -59,6 +60,10 @@ export function LoginPage({ cooldownMinutes }: { cooldownMinutes: number }) {
     <div className="min-h-screen bg-canvas text-fg">
       <div className="app-login-gradient fixed inset-0" />
       <main className="relative mx-auto min-h-screen max-w-6xl px-4 py-4 sm:px-6 sm:py-6 lg:grid lg:place-items-center lg:px-4 lg:py-10">
+        <div className="mb-4 flex justify-end lg:col-span-2">
+          <LanguageSwitcher compact className="md:hidden" />
+          <LanguageSwitcher className="hidden md:flex" />
+        </div>
         <div className="grid w-full gap-6 lg:grid-cols-[1fr_440px] lg:items-center lg:gap-8">
           <section className="order-2 space-y-5 pt-2 lg:order-1 lg:space-y-6 lg:pt-0">
             <div className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent-soft/40 px-4 py-2 text-sm font-bold text-accent-strong">

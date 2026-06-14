@@ -148,3 +148,45 @@ export async function setUserCooldown(admin: AppUser, targetUid: string, cooldow
 
   await batch.commit();
 }
+
+export async function deactivateUser(admin: AppUser, targetUser: AppUser) {
+  if (admin.uid === targetUser.uid) {
+    throw new Error(i18n.t("admin:selfDeactivateBlocked"));
+  }
+
+  const batch = writeBatch(db);
+  batch.update(doc(db, "users", targetUser.uid), {
+    isActive: false,
+    deactivatedAt: Timestamp.now(),
+    deactivatedBy: admin.uid,
+  });
+  batch.set(
+    doc(adminLogsRef),
+    createAuditLog({
+      action: "deactivate_user",
+      admin,
+      targetUser,
+    }),
+  );
+
+  await batch.commit();
+}
+
+export async function reactivateUser(admin: AppUser, targetUser: AppUser) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, "users", targetUser.uid), {
+    isActive: true,
+    deactivatedAt: null,
+    deactivatedBy: null,
+  });
+  batch.set(
+    doc(adminLogsRef),
+    createAuditLog({
+      action: "reactivate_user",
+      admin,
+      targetUser,
+    }),
+  );
+
+  await batch.commit();
+}

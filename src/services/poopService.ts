@@ -140,6 +140,10 @@ export async function registerPoopWithValidation(
   cooldownMinutes: number,
   pointsPerLog: number,
 ) {
+  if (user.isActive === false) {
+    throw new Error(i18n.t("auth:deactivated_user"));
+  }
+
   if (user.termsAccepted !== true) {
     throw new Error("Aceite os termos de uso e privacidade antes de registrar.");
   }
@@ -224,6 +228,10 @@ export async function registerPoop(
   cooldownMinutes: number,
   pointsPerLog: number,
 ) {
+  if (user.isActive === false) {
+    throw new Error(i18n.t("auth:deactivated_user"));
+  }
+
   const cooldown = getCooldownSeconds(userLogs, cooldownMinutes);
   if (cooldown > 0) {
     throw new Error(i18n.t("services:poop.cooldown", { count: Math.ceil(cooldown / 60) }));

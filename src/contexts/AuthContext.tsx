@@ -73,6 +73,14 @@ function isMissingAccountError(error: unknown) {
   );
 }
 
+function assertActiveUserProfile(profile: AppUser) {
+  if (profile.isActive === false) {
+    throw new AuthLoginError("Este usuario foi desativado por um admin.", "deactivated_user");
+  }
+
+  return profile;
+}
+
 async function ensureUserProfile(firebaseUser: User) {
   const userDoc = doc(db, "users", firebaseUser.uid);
   const snapshot = await getDoc(userDoc);
@@ -100,6 +108,7 @@ async function ensureUserProfile(firebaseUser: User) {
       termsAccepted: false,
       cooldownUntil: null,
       bathroomDurationMinutes: 10,
+      isActive: true,
       createdAt: serverTimestamp(),
     });
   }
@@ -110,10 +119,10 @@ async function ensureUserProfile(firebaseUser: User) {
     throw new Error("Não foi possível carregar o perfil do usuário no Firestore.");
   }
 
-  return {
+  return assertActiveUserProfile({
     ...data,
     createdAt: data.createdAt ?? Timestamp.now(),
-  };
+  });
 }
 
 async function registerWithApprovalCode(email: string, password: string, approvalCode: string) {

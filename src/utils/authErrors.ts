@@ -8,6 +8,7 @@ export type AuthLoginErrorCode =
   | "weak_password"
   | "invalid_email"
   | "wrong_password"
+  | "deactivated_user"
   | "firebase_not_configured"
   | "unknown";
 
@@ -37,6 +38,8 @@ export function loginErrorMessage(code: AuthLoginErrorCode, needsCode: boolean) 
       return i18n.t("auth:invalid_email");
     case "wrong_password":
       return i18n.t("auth:wrong_password");
+    case "deactivated_user":
+      return i18n.t("auth:deactivated_user");
     case "firebase_not_configured":
       return i18n.t("auth:firebase_not_configured");
     default:

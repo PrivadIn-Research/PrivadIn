@@ -42,6 +42,9 @@ export interface AppUser {
   acceptedAt?: Timestamp;
   cooldownUntil?: Timestamp;
   bathroomDurationMinutes?: number;
+  isActive?: boolean;
+  deactivatedAt?: Timestamp;
+  deactivatedBy?: string;
 }
 
 export interface PoopLog {
@@ -69,6 +72,9 @@ export interface AppSettings {
   cooldownMinutes: number;
   pointsPerLog: number;
   edition: number;
+  competitionAnnouncement?: string;
+  competitionAnnouncementUpdatedAt?: Timestamp;
+  competitionAnnouncementUpdatedBy?: string;
   updatedAt?: Timestamp;
   updatedBy?: string;
 }
@@ -89,7 +95,10 @@ export type AdminAuditAction =
   | "remove_log"
   | "reset_weekly"
   | "update_cooldown"
-  | "update_points_per_log";
+  | "update_points_per_log"
+  | "deactivate_user"
+  | "reactivate_user"
+  | "update_competition_announcement";
 
 export interface AdminAuditLog {
   id: string;

@@ -75,6 +75,26 @@ export function formatAuditLogMessage(
         });
       }
       break;
+    case "deactivate_user":
+      if (targetName) {
+        return t("auditMessages.deactivateUser", {
+          admin: adminName,
+          target: targetName,
+        });
+      }
+      break;
+    case "reactivate_user":
+      if (targetName) {
+        return t("auditMessages.reactivateUser", {
+          admin: adminName,
+          target: targetName,
+        });
+      }
+      break;
+    case "update_competition_announcement":
+      return t("auditMessages.updateCompetitionAnnouncement", {
+        admin: adminName,
+      });
   }
 
   return auditLog.description ?? t("auditMessages.unknown");

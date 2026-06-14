@@ -4,14 +4,16 @@ import i18n from "../i18n";
 const DICEBEAR_URL_PREFIX = "https://api.dicebear.com/";
 
 export function rankUsers(users: AppUser[]): RankedUser[] {
-  const overall = [...users].sort((a, b) => {
+  const activeUsers = users.filter((user) => user.isActive !== false);
+
+  const overall = [...activeUsers].sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
     const aFirst = a.firstLogAt?.toMillis() ?? a.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
     const bFirst = b.firstLogAt?.toMillis() ?? b.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
     return aFirst - bFirst;
   });
 
-  const weekly = [...users].sort((a, b) => {
+  const weekly = [...activeUsers].sort((a, b) => {
     if (b.weeklyPoints !== a.weeklyPoints) return b.weeklyPoints - a.weeklyPoints;
     const aFirst = a.firstLogAt?.toMillis() ?? a.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
     const bFirst = b.firstLogAt?.toMillis() ?? b.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
@@ -23,7 +25,7 @@ export function rankUsers(users: AppUser[]): RankedUser[] {
   return overall.map((user, index) => ({
     ...user,
     rank: index + 1,
-    weeklyRank: weeklyRanks.get(user.uid) ?? users.length,
+    weeklyRank: weeklyRanks.get(user.uid) ?? activeUsers.length,
   }));
 }
 

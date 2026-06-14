@@ -10,6 +10,13 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function keepsProtectedUserFields() {
+      return request.resource.data.role == resource.data.role
+        && request.resource.data.isActive == resource.data.isActive
+        && request.resource.data.deactivatedAt == resource.data.deactivatedAt
+        && request.resource.data.deactivatedBy == resource.data.deactivatedBy;
+    }
+
     function isAdmin() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
@@ -30,8 +37,11 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if isOwner(userId)
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.role == "player";
-      allow update: if isOwner(userId) || isAdmin();
+        && request.resource.data.role == "player"
+        && request.resource.data.isActive == null
+        && request.resource.data.deactivatedAt == null
+        && request.resource.data.deactivatedBy == null;
+      allow update: if isAdmin() || (isOwner(userId) && keepsProtectedUserFields());
       allow delete: if false;
     }
 

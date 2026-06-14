@@ -26,6 +26,8 @@ i18n.addResources("pt-BR", "dashboard", {
 
 i18n.addResources("pt-BR", "profile", {
   updatePreparing: "Atualizacao {{newVersion}} encontrada. Preparando a nova versao...",
+  applyUpdateButton: "Atualizar para {{version}}",
+  applyUpdateLoading: "Aplicando atualizacao...",
 });
 
 i18n.addResources("pt-BR", "services", {
@@ -45,6 +47,8 @@ i18n.addResources("en-US", "dashboard", {
 
 i18n.addResources("en-US", "profile", {
   updatePreparing: "Update {{newVersion}} found. Preparing the new version...",
+  applyUpdateButton: "Update to {{version}}",
+  applyUpdateLoading: "Applying update...",
 });
 
 i18n.addResources("en-US", "services", {

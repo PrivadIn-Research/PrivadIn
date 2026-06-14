@@ -1,4 +1,12 @@
-import { version as appVersion } from "../../package.json";
+declare const __APP_VERSION__: string;
+
+type UpdateSWHandler = (reloadPage?: boolean) => Promise<void>;
+
+let updateSWHandler: UpdateSWHandler | null = null;
+
+export function setPWAUpdateHandler(handler: UpdateSWHandler) {
+  updateSWHandler = handler;
+}
 
 export interface UpdateCheckResult {
   hasUpdate: boolean;
@@ -16,7 +24,7 @@ export type TriggerPWAUpdateResult = "reloading" | "pending";
  */
 export async function checkForUpdates(): Promise<UpdateCheckResult> {
   try {
-    const currentVersion = appVersion;
+    const currentVersion = __APP_VERSION__;
     const response = await fetch(`/version.json?ts=${Date.now()}`, {
       cache: "no-store",
       headers: {
@@ -63,7 +71,7 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
       error instanceof Error ? error.message : "Unknown error occurred";
     return {
       hasUpdate: false,
-      currentVersion: appVersion,
+      currentVersion: __APP_VERSION__,
       latestVersion: null,
       error: errorMessage,
     };
@@ -138,6 +146,11 @@ function waitForWorkerReady(registration: ServiceWorkerRegistration) {
 }
 
 export async function triggerPWAUpdate(): Promise<TriggerPWAUpdateResult> {
+  if (updateSWHandler) {
+    await updateSWHandler(true);
+    return "reloading";
+  }
+
   if (!("serviceWorker" in navigator)) {
     window.location.reload();
     return "reloading";
@@ -173,5 +186,5 @@ export async function triggerPWAUpdate(): Promise<TriggerPWAUpdateResult> {
  * @returns The version string from package.json
  */
 export function getCurrentVersion(): string {
-  return appVersion;
+  return __APP_VERSION__;
 }

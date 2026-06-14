@@ -21,6 +21,7 @@ export function DashboardPage({
   cooldownMinutes,
   pointsPerLog,
   edition,
+  competitionAnnouncement,
   onPlaySound,
 }: {
   user: AppUser;
@@ -29,6 +30,7 @@ export function DashboardPage({
   cooldownMinutes: number;
   pointsPerLog: number;
   edition: number;
+  competitionAnnouncement: string;
   onPlaySound: () => void;
 }) {
   const { t } = useTranslation(["dashboard", "common"]);
@@ -121,6 +123,15 @@ export function DashboardPage({
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
+      {competitionAnnouncement ? (
+        <Card className="border-accent/20 bg-accent-soft/20">
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-accent-strong">{t("announcementEyebrow")}</p>
+            <p className="text-base font-semibold text-fg sm:text-lg">{competitionAnnouncement}</p>
+          </div>
+        </Card>
+      ) : null}
+
       <section className="order-3 grid grid-cols-2 gap-3 sm:gap-4 md:order-1 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon="💩" label={t("metric.total")} value={formatNumber(user.totalPoints)} hint={t("metric.totalHint", { points: formattedPointsPerLog })} />
         <MetricCard icon="🏆" label={t("metric.rank")} value={`#${currentRank?.rank ?? "-"}`} hint={t("metric.rankHint")} />

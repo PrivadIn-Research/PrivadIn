@@ -14,9 +14,14 @@ import type {
 } from "../types";
 import { adjustUserPoints, removeLog, resetWeeklyRanking } from "../services/poopService";
 import {
+  MAX_COMPETITION_ANNOUNCEMENT_LENGTH,
+  normalizeCompetitionAnnouncement,
+  updateBonusTimeRanges,
+  updateCompetitionAnnouncement,
   updateCooldownMinutes,
   updatePointsPerLog,
 } from "../services/settingsService";
+import { deactivateUser, reactivateUser, setUserCooldown } from "../services/userService";
 import { formatDateTime } from "../utils/date";
 import { formatNumber } from "../utils/format";
 import { toRoman } from "../utils/roman";
@@ -94,6 +99,7 @@ export function AdminPage({
   const [bonusRanges, setBonusRanges] = useState<{ start: string; end: string; points: number }[]>(
     (appSettings as any).bonusTimeRanges ?? [],
   );
+  const [announcementInput, setAnnouncementInput] = useState(appSettings.competitionAnnouncement ?? "");
 
   useEffect(() => {
     setCooldownInput(String(appSettings.cooldownMinutes));
@@ -103,12 +109,17 @@ export function AdminPage({
     setPointsInput(String(appSettings.pointsPerLog));
   }, [appSettings.pointsPerLog]);
 
+  useEffect(() => {
+    setAnnouncementInput(appSettings.competitionAnnouncement ?? "");
+  }, [appSettings.competitionAnnouncement]);
+
   const parsedCooldown = Number(cooldownInput);
   const isCooldownValid =
     Number.isInteger(parsedCooldown) && parsedCooldown >= 1 && parsedCooldown <= 1440;
   const parsedPoints = Number(pointsInput);
   const isPointsValid =
     Number.isInteger(parsedPoints) && parsedPoints >= 1 && parsedPoints <= 100000;
+  const normalizedAnnouncement = normalizeCompetitionAnnouncement(announcementInput);
   const usersById = useMemo(() => buildUsersById(users), [users]);
 
   async function runAdminAction(action: () => Promise<void>, success: string) {
@@ -126,8 +137,6 @@ export function AdminPage({
   async function saveBonusRanges() {
     setBusy(true);
     try {
-      // dynamic import to avoid cycle
-      const { updateBonusTimeRanges } = await import("../services/settingsService");
       await updateBonusTimeRanges(admin, bonusRanges);
       toast.success(t("toast.bonusSaved"));
     } catch (e) {
@@ -141,7 +150,6 @@ export function AdminPage({
   async function setCooldownForUser(targetUid: string, minutes: number) {
     setBusy(true);
     try {
-      const { setUserCooldown } = await import("../services/userService");
       await setUserCooldown(admin, targetUid, minutes);
       toast.success(t("toast.userCooldownSaved"));
     } catch (e) {
@@ -297,6 +305,40 @@ export function AdminPage({
             </div>
           </div>
         </div>
+
+        <div className="mt-6">
+          <h3 className="text-sm font-bold text-fg-soft">{t("announcementTitle")}</h3>
+          <p className="mt-1 text-sm text-fg-muted">{t("announcementDescription")}</p>
+          <label className="mt-3 block">
+            <textarea
+              className="min-h-28 w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
+              maxLength={MAX_COMPETITION_ANNOUNCEMENT_LENGTH}
+              value={announcementInput}
+              onChange={(event) => setAnnouncementInput(event.target.value)}
+              placeholder={t("announcementPlaceholder")}
+            />
+          </label>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-fg-muted">
+              {t("announcementCounter", {
+                count: normalizedAnnouncement.length,
+                max: MAX_COMPETITION_ANNOUNCEMENT_LENGTH,
+              })}
+            </p>
+            <button
+              disabled={busy || normalizedAnnouncement === (appSettings.competitionAnnouncement ?? "")}
+              onClick={() =>
+                runAdminAction(
+                  () => updateCompetitionAnnouncement(admin, announcementInput),
+                  t("toast.announcementSaved"),
+                )
+              }
+              className="rounded-2xl border border-line/10 bg-panel px-5 py-3 font-black text-fg transition hover:bg-panel-strong disabled:opacity-60"
+            >
+              {t("actions.saveAnnouncement")}
+            </button>
+          </div>
+        </div>
         </CollapsibleSection>
       </Card>
 
@@ -400,7 +442,12 @@ export function AdminPage({
                 <div key={user.uid} className="flex items-center gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-3">
                   <AvatarImage avatar={user.avatar} email={user.email} name={user.name} className="h-10 w-10" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-black text-fg">{user.name}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate font-black text-fg">{user.name}</p>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${user.isActive === false ? "bg-danger-soft/45 text-danger" : "bg-success-soft/45 text-success"}`}>
+                        {user.isActive === false ? t("userInactive") : t("userActive")}
+                      </span>
+                    </div>
                     <p className="text-xs text-fg-muted">{t("userPoints", { points: formatNumber(user.totalPoints) })}</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -436,6 +483,29 @@ export function AdminPage({
                         if (Number.isFinite(val) && val >= 0) void setCooldownForUser(user.uid, val);
                       }}>Set cooldown</button>
                     </div>
+                    <button
+                      disabled={busy || admin.uid === user.uid}
+                      className={`rounded-xl px-3 py-2 font-black disabled:opacity-60 ${
+                        user.isActive === false
+                          ? "bg-success-soft/45 text-success hover:bg-success-soft/65"
+                          : "bg-danger-soft/45 text-danger hover:bg-danger-soft/65"
+                      }`}
+                      onClick={() => {
+                        const confirmed = window.confirm(
+                          user.isActive === false
+                            ? t("reactivateConfirm", { name: user.name })
+                            : t("deactivateConfirm", { name: user.name }),
+                        );
+                        if (!confirmed) return;
+
+                        void runAdminAction(
+                          () => (user.isActive === false ? reactivateUser(admin, user) : deactivateUser(admin, user)),
+                          user.isActive === false ? t("toast.userReactivated") : t("toast.userDeactivated"),
+                        );
+                      }}
+                    >
+                      {user.isActive === false ? t("actions.reactivateUser") : t("actions.deactivateUser")}
+                    </button>
                   </div>
                 </div>
               ))}

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Toaster } from "react-hot-toast";
+import { useEffect, useMemo, useState } from "react";
+import { Toaster, toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import {
@@ -25,7 +25,7 @@ import type { AppView } from "./types";
 
 function AppContent() {
   const { t } = useTranslation("common");
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const { appSettings } = useAppSettings();
   const { users, rankedUsers } = useUsers(Boolean(user));
   const [view, setView] = useState<AppView>("dashboard");
@@ -40,6 +40,14 @@ function AppContent() {
     if (!user) return null;
     return users.find((candidate) => candidate.uid === user.uid) ?? user;
   }, [user, users]);
+
+  useEffect(() => {
+    if (liveUser?.isActive === false) {
+      toast.error(t("auth:deactivated_user"));
+      void logout();
+    }
+  }, [liveUser, logout, t]);
+
   const adminAuditLogs = useAdminAuditLogs(liveUser?.role === "admin");
   const registrationRequests = useRegistrationRequests(liveUser?.role === "admin");
   const registrationAttempts = useRegistrationAttempts(liveUser?.role === "admin");
@@ -67,6 +75,7 @@ function AppContent() {
           cooldownMinutes={appSettings.cooldownMinutes}
           pointsPerLog={appSettings.pointsPerLog}
           edition={appSettings.edition}
+          competitionAnnouncement={appSettings.competitionAnnouncement ?? ""}
           onPlaySound={playFlush}
         />
       ) : null}

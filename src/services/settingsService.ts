@@ -19,6 +19,7 @@ export const defaultAppSettings: AppSettings = {
   cooldownMinutes: DEFAULT_COOLDOWN_MINUTES,
   pointsPerLog: DEFAULT_POINTS_PER_LOG,
   edition: DEFAULT_EDITION,
+  overallRankingVisible: false,
   competitionAnnouncement: "",
 };
 
@@ -58,6 +59,7 @@ export function parseAppSettings(
       Number(data?.pointsPerLog ?? DEFAULT_POINTS_PER_LOG),
     ),
     edition: normalizeEdition(Number(data?.edition ?? DEFAULT_EDITION)),
+    overallRankingVisible: data?.overallRankingVisible === true,
     competitionAnnouncement: String(data?.competitionAnnouncement ?? "").trim().slice(0, MAX_COMPETITION_ANNOUNCEMENT_LENGTH),
   };
 }

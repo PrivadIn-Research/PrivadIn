@@ -72,6 +72,7 @@ export interface AppSettings {
   cooldownMinutes: number;
   pointsPerLog: number;
   edition: number;
+  overallRankingVisible?: boolean;
   competitionAnnouncement?: string;
   competitionAnnouncementUpdatedAt?: Timestamp;
   competitionAnnouncementUpdatedBy?: string;

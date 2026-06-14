@@ -12,20 +12,26 @@ export function StatsPage({
   logs,
   allLogs,
   rankedUsers,
+  overallRankingVisible,
 }: {
   user: AppUser;
   logs: PoopLog[];
   allLogs: PoopLog[];
   rankedUsers: RankedUser[];
+  overallRankingVisible: boolean;
 }) {
   const { t } = useTranslation("stats");
+  const king = rankedUsers[0];
   const streakLeader = [...rankedUsers].sort((a, b) => b.bestStreak - a.bestStreak)[0];
   const weeklyTotal = rankedUsers.reduce((sum, ranked) => sum + ranked.weeklyPoints, 0);
   const achievements = getAchievements(user, logs);
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <section className={`grid grid-cols-2 gap-3 sm:gap-4 ${overallRankingVisible ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}>
+        {overallRankingVisible ? (
+          <MetricCard icon="👑" label={t("metric.king")} value={king?.name ?? "-"} hint={t("metric.kingHint", { points: formatNumber(king?.totalPoints ?? 0) })} />
+        ) : null}
         <MetricCard icon="🔥" label={t("metric.streakLeader")} value={formatNumber(streakLeader?.bestStreak ?? 0)} hint={streakLeader?.name ?? t("metric.streakLeaderFallback")} />
         <MetricCard icon="🚽" label={t("metric.productiveHour")} value={getProductiveHour(allLogs)} hint={t("metric.productiveHourHint")} />
         <MetricCard icon="📈" label={t("metric.weeklyTotal")} value={formatNumber(weeklyTotal)} hint={t("metric.weeklyTotalHint")} />

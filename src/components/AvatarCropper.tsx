@@ -11,6 +11,7 @@ import {
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 2.6;
 const FRAME_SIZE = AVATAR_CROP_FRAME_SIZE;
+const PREVIEW_SIZE = 144;
 
 export function AvatarCropper({
   imageUrl,
@@ -41,6 +42,7 @@ export function AvatarCropper({
       height: imageSize.height * scale,
     };
   }, [imageSize, scale]);
+  const previewScale = PREVIEW_SIZE / FRAME_SIZE;
 
   useEffect(() => {
     if (!imageSize) return;
@@ -142,8 +144,8 @@ export function AvatarCropper({
                 width: renderedSize.width,
               }}
             />
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,transparent_92px,rgba(15,23,42,0.6)_93px)]" />
-            <div className="pointer-events-none absolute inset-[18px] rounded-full border-2 border-white/80" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,transparent_126px,rgba(15,23,42,0.6)_127px)]" />
+            <div className="pointer-events-none absolute inset-0 rounded-full border-2 border-white/80" />
           </div>
 
           <label className="mt-4 block">
@@ -170,10 +172,10 @@ export function AvatarCropper({
                 className="pointer-events-none absolute select-none object-cover"
                 draggable={false}
                 style={{
-                  height: renderedSize.height,
-                  left: FRAME_SIZE / 2 - renderedSize.width / 2 + offset.x - (FRAME_SIZE - 144) / 2,
-                  top: FRAME_SIZE / 2 - renderedSize.height / 2 + offset.y - (FRAME_SIZE - 144) / 2,
-                  width: renderedSize.width,
+                  height: renderedSize.height * previewScale,
+                  left: PREVIEW_SIZE / 2 - (renderedSize.width * previewScale) / 2 + offset.x * previewScale,
+                  top: PREVIEW_SIZE / 2 - (renderedSize.height * previewScale) / 2 + offset.y * previewScale,
+                  width: renderedSize.width * previewScale,
                 }}
               />
             </div>

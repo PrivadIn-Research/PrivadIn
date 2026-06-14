@@ -1,14 +1,15 @@
 import type { PoopLocation } from "../types";
+import { RegisterPoopError } from "../utils/registerPoopError";
 
 export async function requestCurrentLocation(): Promise<PoopLocation> {
   if (!("geolocation" in navigator)) {
-    throw new Error("Geolocalizacao nao esta disponivel neste dispositivo.");
+    throw new RegisterPoopError("location_unavailable", "Geolocalizacao nao esta disponivel neste dispositivo.");
   }
 
   if ("permissions" in navigator) {
     const permission = await navigator.permissions.query({ name: "geolocation" });
     if (permission.state === "denied") {
-      throw new Error("Permissao de localizacao negada. Libere a localizacao no navegador.");
+      throw new RegisterPoopError("location_denied", "Permissao de localizacao negada. Libere a localizacao no navegador.");
     }
   }
 
@@ -22,7 +23,7 @@ export async function requestCurrentLocation(): Promise<PoopLocation> {
         });
       },
       () => {
-        reject(new Error("Nao foi possivel capturar sua localizacao agora."));
+        reject(new RegisterPoopError("location_unavailable", "Nao foi possivel capturar sua localizacao agora."));
       },
       {
         enableHighAccuracy: true,

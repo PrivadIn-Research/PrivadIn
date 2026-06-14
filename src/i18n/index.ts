@@ -16,6 +16,44 @@ void i18n
     },
   });
 
+i18n.addResources("pt-BR", "dashboard", {
+  metric: {
+    weeklyPoints: "Pontos da semana",
+    weeklyPointsHint: "So voce ve sua pontuacao acumulada durante a semana",
+  },
+  resolveProfileAction: "Resolver no perfil",
+});
+
+i18n.addResources("pt-BR", "profile", {
+  updatePreparing: "Atualizacao {{newVersion}} encontrada. Preparando a nova versao...",
+});
+
+i18n.addResources("pt-BR", "services", {
+  poop: {
+    missingTerms: "Aceite os termos e salve suas preferencias no perfil antes de registrar.",
+    missingWorkSchedule: "Preencha seu horario de expediente no perfil antes de registrar.",
+  },
+});
+
+i18n.addResources("en-US", "dashboard", {
+  metric: {
+    weeklyPoints: "Weekly points",
+    weeklyPointsHint: "Only your running score stays visible during the week",
+  },
+  resolveProfileAction: "Open profile",
+});
+
+i18n.addResources("en-US", "profile", {
+  updatePreparing: "Update {{newVersion}} found. Preparing the new version...",
+});
+
+i18n.addResources("en-US", "services", {
+  poop: {
+    missingTerms: "Accept the terms and save your profile preferences before logging a break.",
+    missingWorkSchedule: "Fill in your work schedule in the profile before logging a break.",
+  },
+});
+
 if (typeof document !== "undefined") {
   document.documentElement.lang = i18n.resolvedLanguage ?? DEFAULT_LANGUAGE;
   document.documentElement.dir = getLanguageDirection(i18n.resolvedLanguage);

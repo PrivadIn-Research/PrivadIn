@@ -77,12 +77,13 @@ function AppContent() {
           edition={appSettings.edition}
           competitionAnnouncement={appSettings.competitionAnnouncement ?? ""}
           onPlaySound={playFlush}
+          onOpenProfile={() => setView("profile")}
         />
       ) : null}
       {view === "profile" ? <EditProfilePage user={liveUser} /> : null}
       {view === "history" ? <HistoryPage logs={userLogs} /> : null}
       {view === "stats" ? <StatsPage user={liveUser} logs={userLogs} allLogs={allLogs} rankedUsers={rankedUsers} /> : null}
-      {view === "cuiter" ? <CuiterPage user={liveUser} userLogs={userLogs} /> : null}
+      {view === "cuiter" ? <CuiterPage user={liveUser} userLogs={userLogs} users={users} /> : null}
       {view === "admin" && liveUser.role === "admin" ? (
         <AdminPage
           admin={liveUser}

@@ -151,21 +151,12 @@ export async function registerPoopWithValidation(
     throw new RegisterPoopError("deactivated_user", i18n.t("auth:deactivated_user"));
   }
 
-  const currentTermsVersion = getCurrentTermsVersion({
-    termsOfUseVersion: undefined,
-  });
-  if (!hasAcceptedCurrentTerms(user, { termsOfUseVersion: currentTermsVersion })) {
-    throw new RegisterPoopError(
-      "missing_terms",
-      i18n.t("services:poop.missingTerms"),
-      "profile",
-    );
-  }
-
   if (!hasCompleteWorkSchedule(user.workSchedule)) {
     throw new RegisterPoopError(
       "missing_work_schedule",
-      i18n.t("services:poop.missingWorkSchedule"),
+      i18n.t("services:poop.missingWorkSchedule", {
+        defaultValue: "Preencha seu horario de expediente no perfil antes de registrar.",
+      }),
       "profile",
     );
   }
@@ -213,7 +204,9 @@ export async function registerPoopWithValidation(
     if (!hasCompleteWorkSchedule(currentUser.workSchedule)) {
       throw new RegisterPoopError(
         "missing_work_schedule",
-        i18n.t("services:poop.missingWorkSchedule"),
+        i18n.t("services:poop.missingWorkSchedule", {
+          defaultValue: "Preencha seu horario de expediente no perfil antes de registrar.",
+        }),
         "profile",
       );
     }
@@ -225,8 +218,10 @@ export async function registerPoopWithValidation(
     if (!hasAcceptedCurrentTerms(currentUser, { termsOfUseVersion: currentTermsVersion })) {
       throw new RegisterPoopError(
         "missing_terms",
-        i18n.t("services:poop.missingTerms"),
-        "profile",
+        i18n.t("services:poop.missingTerms", {
+          defaultValue: "Aceite os termos atualizados para continuar registrando.",
+        }),
+        "terms",
       );
     }
     const resolvedPoints = resolvePointsPerLog(settings, localTime, pointsPerLog);

@@ -47,6 +47,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   acceptPendingTerms: () => Promise<void>;
+  openTermsReview: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -362,6 +363,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...updatedProfile,
           createdAt: updatedProfile.createdAt ?? Timestamp.now(),
         }));
+      },
+      openTermsReview: async () => {
+        if (!firebaseUser) return;
+        setLoading(true);
+        try {
+          const [profile, appSettings] = await Promise.all([ensureUserProfile(firebaseUser), loadAppSettings()]);
+          setCurrentAppSettings(appSettings);
+          setUser(null);
+          setPendingTermsUser(profile);
+        } finally {
+          setLoading(false);
+        }
       },
     }),
     [currentAppSettings, firebaseUser, loading, pendingTermsUser, user],

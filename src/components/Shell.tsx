@@ -129,7 +129,7 @@ export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, c
           >
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const active = view === item.view;
+                const active = view === item.view || (item.view === "profile" && view === "edit-profile");
               return (
                 <button
                   key={item.view}

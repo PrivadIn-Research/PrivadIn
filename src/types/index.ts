@@ -3,7 +3,7 @@ import type { Timestamp } from "@firebase/firestore";
 export type AppLanguage = "pt-BR" | "en-US" | "es-ES" | "zh-Hans" | "ar" | "jam-JM" | "pap-CW";
 export type AppTheme = "light" | "dark";
 
-export type AppView = "dashboard" | "poopcoins" | "history" | "stats" | "cuiter" | "admin" | "profile";
+export type AppView = "dashboard" | "poopcoins" | "history" | "stats" | "cuiter" | "admin" | "profile" | "edit-profile";
 
 export type UserRole = "player" | "admin";
 
@@ -48,6 +48,7 @@ export interface AppUser {
   deactivatedBy?: string;
   poopcoinBalance?: number;
   poopcoinMigratedAt?: Timestamp;
+  bio?: string;
 }
 
 export interface PoopLog {

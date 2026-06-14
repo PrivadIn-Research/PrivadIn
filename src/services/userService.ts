@@ -44,7 +44,7 @@ export async function deleteAvatarFile(path?: string | null) {
 
 export async function updateUserProfile(
   firebaseUid: string,
-  updates: { name?: string; nickname?: string; avatar?: string; avatarStoragePath?: string | null },
+  updates: { name?: string; nickname?: string; avatar?: string; avatarStoragePath?: string | null; bio?: string },
 ) {
   const userDoc = doc(db, "users", firebaseUid);
   const payload: Partial<AppUser> = {};
@@ -88,6 +88,7 @@ export async function updateUserProfile(
   }
   if (typeof updates.avatar === "string") payload.avatar = updates.avatar.trim();
   if ("avatarStoragePath" in updates) payload.avatarStoragePath = updates.avatarStoragePath ?? null;
+  if (typeof updates.bio === "string") payload.bio = updates.bio.trim();
 
   if (Object.keys(payload).length > 0) {
     await updateDoc(userDoc, payload);

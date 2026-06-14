@@ -20,6 +20,7 @@ import { HistoryPage } from "./pages/HistoryPage";
 import { StatsPage } from "./pages/StatsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { EditProfilePage } from "./pages/EditProfilePage";
+import { UserProfilePage } from "./pages/UserProfilePage";
 import { CuiterPage } from "./pages/CuiterPage";
 import { PoopcoinsPage } from "./pages/PoopcoinsPage";
 import { useTheme } from "./hooks/useTheme";
@@ -31,6 +32,8 @@ function AppContent() {
   const { appSettings } = useAppSettings();
   const { users, rankedUsers } = useUsers(Boolean(user));
   const [view, setView] = useState<AppView>("dashboard");
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [previousView, setPreviousView] = useState<AppView>("dashboard");
   const { logs: userLogs } = useUserLogs(
     user?.uid,
     Boolean(user) && view !== "admin" && view !== "profile",
@@ -43,6 +46,24 @@ function AppContent() {
     if (!user) return null;
     return users.find((candidate) => candidate.uid === user.uid) ?? user;
   }, [user, users]);
+
+  const profileUser = useMemo(() => {
+    if (!profileUserId) return liveUser;
+    return users.find((candidate) => candidate.uid === profileUserId) ?? liveUser;
+  }, [profileUserId, users, liveUser]);
+
+  const handleViewProfile = (uid: string) => {
+    setPreviousView(view);
+    setProfileUserId(uid);
+    setView("profile");
+  };
+
+  const handleViewChange = (newView: AppView) => {
+    if (newView === "profile" && liveUser) {
+      setProfileUserId(liveUser.uid);
+    }
+    setView(newView);
+  };
 
   useEffect(() => {
     if (liveUser?.isActive === false) {
@@ -76,7 +97,7 @@ function AppContent() {
   }
 
   return (
-    <Shell currentUser={liveUser} view={view} onViewChange={setView} muted={muted} onToggleMuted={toggleMuted}>
+    <Shell currentUser={liveUser} view={view} onViewChange={handleViewChange} muted={muted} onToggleMuted={toggleMuted}>
       {view === "dashboard" ? (
         <DashboardPage
           user={liveUser}
@@ -88,14 +109,24 @@ function AppContent() {
           competitionAnnouncement={appSettings.competitionAnnouncement ?? ""}
           overallRankingVisible={appSettings.overallRankingVisible === true}
           onPlaySound={playFlush}
-          onOpenProfile={() => setView("profile")}
+          onOpenProfile={() => handleViewProfile(liveUser.uid)}
         />
       ) : null}
-      {view === "profile" ? <EditProfilePage user={liveUser} appSettings={appSettings} /> : null}
+      {view === "profile" && profileUser ? (
+        <UserProfilePage
+          currentUser={liveUser}
+          profileUser={profileUser}
+          setView={setView}
+          onBack={() => setView(previousView)}
+        />
+      ) : null}
+      {view === "edit-profile" ? (
+        <EditProfilePage user={liveUser} appSettings={appSettings} setView={setView} />
+      ) : null}
       {view === "poopcoins" ? <PoopcoinsPage user={liveUser} users={users} transactions={poopcoinTransactions} /> : null}
       {view === "history" ? <HistoryPage logs={userLogs} /> : null}
       {view === "stats" ? <StatsPage user={liveUser} logs={userLogs} allLogs={allLogs} rankedUsers={rankedUsers} overallRankingVisible={appSettings.overallRankingVisible === true} /> : null}
-      {view === "cuiter" ? <CuiterPage user={liveUser} users={users} /> : null}
+      {view === "cuiter" ? <CuiterPage user={liveUser} users={users} onViewProfile={handleViewProfile} /> : null}
       {view === "admin" && liveUser.role === "admin" ? (
         <AdminPage
           admin={liveUser}

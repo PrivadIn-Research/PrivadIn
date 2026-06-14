@@ -19,9 +19,11 @@ import { countGraphemes, sliceGraphemes } from "../utils/grapheme";
 export function CuiterPage({
   user,
   users,
+  onViewProfile,
 }: {
   user: AppUser;
   users: AppUser[];
+  onViewProfile: (userId: string) => void;
 }) {
   const { t } = useTranslation("cuiter");
   const [message, setMessage] = useState("");
@@ -169,9 +171,12 @@ export function CuiterPage({
             orderedPosts.map((post) => (
               <article key={post.id} className="rounded-2xl border border-line/10 bg-panel-strong/40 p-4">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="truncate text-sm font-black text-fg">
+                  <button
+                    onClick={() => onViewProfile(post.userId)}
+                    className="truncate text-sm font-black text-accent-strong hover:underline text-left"
+                  >
                     {resolvePostAuthor(post)}
-                  </p>
+                  </button>
                   <p className="shrink-0 text-xs text-fg-muted">{formatTimeAgo(post.createdAt)}</p>
                 </div>
                 <p className="text-sm text-fg-soft">{post.message}</p>

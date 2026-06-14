@@ -2,7 +2,6 @@ import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState 
 import { collection, getDocs, query, where } from "@firebase/firestore";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
-import { Copy } from "lucide-react";
 import { AvatarCropper } from "../components/AvatarCropper";
 import { AvatarImage } from "../components/AvatarImage";
 import { Card } from "../components/Card";
@@ -421,15 +420,6 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
     }
   }
 
-  async function handleCopyUserId() {
-    try {
-      await navigator.clipboard.writeText(user.uid);
-      toast.success(t("userIdCopied", { defaultValue: "ID copiado." }));
-    } catch {
-      toast.error(t("userIdCopyError", { defaultValue: "Nao foi possivel copiar o ID." }));
-    }
-  }
-
   async function handleApplyUpdate() {
     if (!latestVersion) return;
 
@@ -448,26 +438,6 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <Card>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-accent-strong">{t("userIdEyebrow", { defaultValue: "Identificador" })}</p>
-            <h2 className="text-2xl font-black text-fg">{t("userIdTitle", { defaultValue: "Seu ID para Poopcoins" })}</h2>
-            <code className="mt-2 block truncate rounded-2xl border border-line/10 bg-field px-4 py-3 text-sm text-fg-soft">
-              {user.uid}
-            </code>
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleCopyUserId()}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg transition hover:bg-accent-strong"
-          >
-            <Copy size={18} />
-            {t("userIdCopy", { defaultValue: "Copiar ID" })}
-          </button>
-        </div>
-      </Card>
-
       <Card>
         <div className="mb-4">
           <p className="text-sm font-bold text-accent-strong">{t("eyebrow")}</p>

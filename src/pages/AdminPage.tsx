@@ -533,12 +533,13 @@ export function AdminPage({
           >
             <div className="space-y-3">
               {users.map((user) => (
-                <div key={user.uid} className="flex items-center gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-3">
-                  <AvatarImage avatar={user.avatar} email={user.email} name={user.name} className="h-10 w-10" />
+                <div key={user.uid} className="grid gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <AvatarImage avatar={user.avatar} email={user.email} name={user.name} className="h-10 w-10 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-black text-fg">{user.name}</p>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${user.isActive === false ? "bg-danger-soft/45 text-danger" : "bg-success-soft/45 text-success"}`}>
+                      <p className="min-w-0 truncate font-black text-fg">{user.name}</p>
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${user.isActive === false ? "bg-danger-soft/45 text-danger" : "bg-success-soft/45 text-success"}`}>
                         {user.isActive === false ? t("userInactive") : t("userActive")}
                       </span>
                     </div>
@@ -546,7 +547,8 @@ export function AdminPage({
                       {t("userPoints", { points: formatNumber(user.totalPoints) })} · {formatPoopcoins(user.poopcoinBalance)} PC
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
+                  </div>
+                  <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-[auto_auto_minmax(0,1fr)_auto] lg:flex lg:flex-wrap lg:items-center lg:justify-end">
                     <button
                       disabled={busy}
                       className="rounded-xl bg-panel px-3 py-2 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
@@ -561,7 +563,7 @@ export function AdminPage({
                     </button>
                     <button
                       disabled={busy}
-                      className="rounded-xl bg-accent px-3 py-2 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60"
+                      className="min-w-0 rounded-xl bg-accent px-3 py-2 text-sm font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60"
                       onClick={() =>
                         runAdminAction(
                           () => adjustUserPoints(admin, user, appSettings.pointsPerLog),
@@ -571,9 +573,9 @@ export function AdminPage({
                     >
                       +{formatNumber(appSettings.pointsPerLog)}
                     </button>
-                    <div className="flex items-center gap-2">
-                      <input type="number" min={0} placeholder="Cooldown min" className="w-28 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none" id={`cooldown-${user.uid}`} />
-                      <button className="rounded-xl bg-panel px-3 py-2 font-black text-fg" onClick={() => {
+                    <div className="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2 sm:col-span-2 lg:flex">
+                      <input type="number" min={0} placeholder="Cooldown min" className="min-w-0 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none lg:w-28" id={`cooldown-${user.uid}`} />
+                      <button className="shrink-0 rounded-xl bg-panel px-3 py-2 text-sm font-black text-fg" onClick={() => {
                         const el = document.getElementById(`cooldown-${user.uid}`) as HTMLInputElement | null;
                         const val = el?.value ? Number(el.value) : 0;
                         if (Number.isFinite(val) && val >= 0) void setCooldownForUser(user.uid, val);
@@ -581,7 +583,7 @@ export function AdminPage({
                     </div>
                     <button
                       disabled={busy || admin.uid === user.uid}
-                      className={`rounded-xl px-3 py-2 font-black disabled:opacity-60 ${
+                      className={`col-span-2 min-w-0 rounded-xl px-3 py-2 text-sm font-black disabled:opacity-60 sm:col-span-1 ${
                         user.isActive === false
                           ? "bg-success-soft/45 text-success hover:bg-success-soft/65"
                           : "bg-danger-soft/45 text-danger hover:bg-danger-soft/65"
@@ -606,7 +608,7 @@ export function AdminPage({
                       type="number"
                       step={1}
                       placeholder="+/- PC"
-                      className="w-24 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none"
+                      className="min-w-0 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none lg:w-24"
                       value={poopcoinAmounts[user.uid] ?? ""}
                       onChange={(event) =>
                         setPoopcoinAmounts((current) => ({ ...current, [user.uid]: event.target.value }))
@@ -615,7 +617,7 @@ export function AdminPage({
                     <input
                       type="text"
                       placeholder="Motivo"
-                      className="w-40 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none"
+                      className="min-w-0 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none lg:w-40"
                       value={poopcoinReasons[user.uid] ?? ""}
                       onChange={(event) =>
                         setPoopcoinReasons((current) => ({ ...current, [user.uid]: event.target.value }))
@@ -628,7 +630,7 @@ export function AdminPage({
                         Number(poopcoinAmounts[user.uid]) === 0 ||
                         !poopcoinReasons[user.uid]?.trim()
                       }
-                      className="rounded-xl bg-panel px-3 py-2 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
+                      className="min-w-0 rounded-xl bg-panel px-3 py-2 text-sm font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
                       onClick={() => void runPoopcoinAdjustment(user)}
                     >
                       Ajustar PC

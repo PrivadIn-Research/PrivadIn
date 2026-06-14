@@ -1,6 +1,5 @@
 import {
   Timestamp,
-  addDoc,
   collection,
   doc,
   getDoc,
@@ -10,7 +9,6 @@ import {
   orderBy,
   query,
   runTransaction,
-  updateDoc,
   where,
   writeBatch,
 } from "@firebase/firestore";
@@ -33,6 +31,7 @@ import {
 import i18n from "../i18n";
 import { RegisterPoopError } from "../utils/registerPoopError";
 import { getCurrentTermsVersion, hasAcceptedCurrentTerms } from "../utils/terms";
+import { appendPoopcoinTransaction } from "./poopcoinService";
 
 export const usersRef = collection(db, "users");
 export const logsRef = collection(db, "poop_logs");
@@ -48,6 +47,8 @@ export function createAuditLog({
   cooldownMinutes,
   pointsPerLog,
   edition,
+  poopcoins,
+  poopcoinTransactionHash,
 }: {
   action: AdminAuditAction;
   admin: AppUser;
@@ -58,6 +59,8 @@ export function createAuditLog({
   cooldownMinutes?: number;
   pointsPerLog?: number;
   edition?: number;
+  poopcoins?: number;
+  poopcoinTransactionHash?: string;
 }) {
   return {
     action,
@@ -69,6 +72,8 @@ export function createAuditLog({
     cooldownMinutes: cooldownMinutes ?? null,
     pointsPerLog: pointsPerLog ?? null,
     edition: edition ?? null,
+    poopcoins: poopcoins ?? null,
+    poopcoinTransactionHash: poopcoinTransactionHash ?? null,
     createdAt: Timestamp.now(),
   };
 }
@@ -190,6 +195,7 @@ export async function registerPoopWithValidation(
   const localTime = assertActiveWorkTime(schedule, nowDate);
   const userRef = doc(db, "users", user.uid);
   const settingsRef = doc(db, "app_settings", APP_SETTINGS_DOC_ID);
+  const logRef = doc(logsRef);
 
   await runTransaction(db, async (transaction) => {
     const [userSnapshot, settingsSnapshot] = await Promise.all([
@@ -242,7 +248,18 @@ export async function registerPoopWithValidation(
       ...userLogs,
     ];
 
-    transaction.set(doc(logsRef), {
+    const poopcoinTransaction = await appendPoopcoinTransaction(transaction, {
+      type: "mint_log",
+      entries: [{ userId: user.uid, delta: 1 }],
+      amount: 1,
+      createdBy: user.uid,
+      createdByRole: currentUser.role,
+      toUserId: user.uid,
+      linkedLogId: logRef.id,
+      createdAt: now,
+    });
+
+    transaction.set(logRef, {
       userId: user.uid,
       userName: currentUser.name,
       createdAt: now,
@@ -253,10 +270,12 @@ export async function registerPoopWithValidation(
       localTime,
       durationMinutes,
       competitionEdition: currentEdition,
+      poopcoinTransactionHash: poopcoinTransaction.hash,
     });
     transaction.update(userRef, {
       totalPoints: increment(resolvedPoints),
       weeklyPoints: increment(resolvedPoints),
+      poopcoinBalance: increment(1),
       firstLogAt: currentUser.firstLogAt ?? now,
       lastLogAt: now,
       cooldownUntil: nextCooldown,
@@ -309,23 +328,43 @@ export async function registerPoop(
   ];
 
   const userDoc = doc(db, "users", user.uid);
-  const logDoc = await addDoc(logsRef, {
-    userId: user.uid,
-    userName: user.name,
-    createdAt: now,
-    points: pointsPerLog,
-    isWeeklyActive: true,
-    competitionEdition: currentEdition,
-  });
+  const logDoc = doc(logsRef);
 
-  await updateDoc(userDoc, {
-    totalPoints: increment(pointsPerLog),
-    weeklyPoints: increment(pointsPerLog),
-    firstLogAt: user.firstLogAt ?? now,
-    lastLogAt: now,
-    currentDailyStreak: calculateDailyStreak(nextLogs),
-    currentWeeklyStreak: calculateWeeklyStreak(nextLogs),
-    bestStreak: Math.max(user.bestStreak ?? 0, calculateDailyStreak(nextLogs)),
+  await runTransaction(db, async (transaction) => {
+    const userSnapshot = await transaction.get(userDoc);
+    const currentUser = userSnapshot.data() as AppUser | undefined;
+    const role = currentUser?.role ?? user.role;
+    const poopcoinTransaction = await appendPoopcoinTransaction(transaction, {
+      type: "mint_log",
+      entries: [{ userId: user.uid, delta: 1 }],
+      amount: 1,
+      createdBy: user.uid,
+      createdByRole: role,
+      toUserId: user.uid,
+      linkedLogId: logDoc.id,
+      createdAt: now,
+    });
+
+    transaction.set(logDoc, {
+      userId: user.uid,
+      userName: user.name,
+      createdAt: now,
+      points: pointsPerLog,
+      isWeeklyActive: true,
+      competitionEdition: currentEdition,
+      poopcoinTransactionHash: poopcoinTransaction.hash,
+    });
+
+    transaction.update(userDoc, {
+      totalPoints: increment(pointsPerLog),
+      weeklyPoints: increment(pointsPerLog),
+      poopcoinBalance: increment(1),
+      firstLogAt: user.firstLogAt ?? now,
+      lastLogAt: now,
+      currentDailyStreak: calculateDailyStreak(nextLogs),
+      currentWeeklyStreak: calculateWeeklyStreak(nextLogs),
+      bestStreak: Math.max(user.bestStreak ?? 0, calculateDailyStreak(nextLogs)),
+    });
   });
 
   return logDoc.id;
@@ -341,31 +380,48 @@ export async function adjustUserPoints(admin: AppUser, targetUser: AppUser, delt
   const now = Timestamp.now();
 
   if (delta > 0) {
-    const batch = writeBatch(db);
-    batch.set(doc(logsRef), {
-      userId: targetUser.uid,
-      userName: targetName,
-      createdAt: now,
-      points: delta,
-      isWeeklyActive: true,
-      competitionEdition: currentEdition,
+    const logRef = doc(logsRef);
+    await runTransaction(db, async (transaction) => {
+      const poopcoinTransaction = await appendPoopcoinTransaction(transaction, {
+        type: "mint_log",
+        entries: [{ userId: targetUser.uid, delta: 1 }],
+        amount: 1,
+        createdBy: admin.uid,
+        createdByRole: admin.role,
+        toUserId: targetUser.uid,
+        linkedLogId: logRef.id,
+        createdAt: now,
+        reason: "Ajuste manual de pontos.",
+      });
+
+      transaction.set(logRef, {
+        userId: targetUser.uid,
+        userName: targetName,
+        createdAt: now,
+        points: delta,
+        isWeeklyActive: true,
+        competitionEdition: currentEdition,
+        poopcoinTransactionHash: poopcoinTransaction.hash,
+      });
+      transaction.update(userDoc, {
+        totalPoints: increment(delta),
+        weeklyPoints: increment(delta),
+        poopcoinBalance: increment(1),
+        firstLogAt: targetData?.firstLogAt ?? now,
+        lastLogAt: now,
+      });
+      transaction.set(
+        doc(adminLogsRef),
+        createAuditLog({
+          action: "adjust_points",
+          admin,
+          targetUser,
+          delta,
+          poopcoins: 1,
+          poopcoinTransactionHash: poopcoinTransaction.hash,
+        }),
+      );
     });
-    batch.update(userDoc, {
-      totalPoints: increment(delta),
-      weeklyPoints: increment(delta),
-      firstLogAt: targetData?.firstLogAt ?? now,
-      lastLogAt: now,
-    });
-    batch.set(
-      doc(adminLogsRef),
-      createAuditLog({
-        action: "adjust_points",
-        admin,
-        targetUser,
-        delta,
-      }),
-    );
-    await batch.commit();
     return;
   }
 
@@ -377,31 +433,57 @@ export async function adjustUserPoints(admin: AppUser, targetUser: AppUser, delt
     }
 
     const logData = latestLog.data() as Omit<PoopLog, "id">;
-    const batch = writeBatch(db);
-    batch.delete(latestLog.ref);
-    batch.update(userDoc, {
-      totalPoints: increment(delta),
-      weeklyPoints: logData.isWeeklyActive ? increment(delta) : increment(0),
+    await runTransaction(db, async (transaction) => {
+      const poopcoinTransaction = await appendPoopcoinTransaction(transaction, {
+        type: "admin_adjustment",
+        entries: [{ userId: targetUser.uid, delta: -1 }],
+        amount: 1,
+        createdBy: admin.uid,
+        createdByRole: admin.role,
+        fromUserId: targetUser.uid,
+        linkedLogId: latestLog.id,
+        reason: "Remocao de pontos sincronizada com Poopcoins.",
+      });
+
+      transaction.delete(latestLog.ref);
+      transaction.update(userDoc, {
+        totalPoints: increment(delta),
+        weeklyPoints: logData.isWeeklyActive ? increment(delta) : increment(0),
+        poopcoinBalance: increment(-1),
+      });
+      transaction.set(
+        doc(adminLogsRef),
+        createAuditLog({
+          action: "adjust_points",
+          admin,
+          targetUser,
+          delta,
+          poopcoins: -1,
+          poopcoinTransactionHash: poopcoinTransaction.hash,
+        }),
+      );
     });
-    batch.set(
-      doc(adminLogsRef),
-      createAuditLog({
-        action: "adjust_points",
-        admin,
-        targetUser,
-        delta,
-      }),
-    );
-    await batch.commit();
   }
 }
 
 export async function removeLog(admin: AppUser, log: PoopLog) {
   await runTransaction(db, async (transaction) => {
+    const poopcoinTransaction = await appendPoopcoinTransaction(transaction, {
+      type: "admin_adjustment",
+      entries: [{ userId: log.userId, delta: -1 }],
+      amount: 1,
+      createdBy: admin.uid,
+      createdByRole: admin.role,
+      fromUserId: log.userId,
+      linkedLogId: log.id,
+      reason: "Registro removido por admin.",
+    });
+
     transaction.delete(doc(db, "poop_logs", log.id));
     transaction.update(doc(db, "users", log.userId), {
       totalPoints: increment(-log.points),
       weeklyPoints: log.isWeeklyActive ? increment(-log.points) : increment(0),
+      poopcoinBalance: increment(-1),
     });
     transaction.set(
       doc(adminLogsRef),
@@ -411,6 +493,8 @@ export async function removeLog(admin: AppUser, log: PoopLog) {
         targetUser: { uid: log.userId },
         points: log.points,
         removedLogId: log.id,
+        poopcoins: -1,
+        poopcoinTransactionHash: poopcoinTransaction.hash,
       }),
     );
   });

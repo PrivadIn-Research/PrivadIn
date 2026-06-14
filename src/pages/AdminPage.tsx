@@ -9,6 +9,7 @@ import type {
   AppSettings,
   AppUser,
   PoopLog,
+  PoopcoinTransaction,
   RegistrationAttempt,
   RegistrationRequest,
 } from "../types";
@@ -33,6 +34,12 @@ import {
   formatAuditLogMessage,
   resolveUserDisplayName,
 } from "../utils/auditLog";
+import {
+  adjustPoopcoins,
+  formatPoopcoins,
+  migratePoopcoinsForLogs,
+  reversePoopcoinTransaction,
+} from "../services/poopcoinService";
 
 function actionLabel(action: AdminAuditLog["action"], t: (key: string) => string) {
   return t(`actionLabels.${action}`);
@@ -86,6 +93,7 @@ export function AdminPage({
   auditLogs,
   registrationRequests,
   registrationAttempts,
+  poopcoinTransactions,
 }: {
   admin: AppUser;
   users: AppUser[];
@@ -94,6 +102,7 @@ export function AdminPage({
   auditLogs: AdminAuditLog[];
   registrationRequests: RegistrationRequest[];
   registrationAttempts: RegistrationAttempt[];
+  poopcoinTransactions: PoopcoinTransaction[];
 }) {
   const { t } = useTranslation("admin");
   const [busy, setBusy] = useState(false);
@@ -104,6 +113,10 @@ export function AdminPage({
   );
   const [announcementInput, setAnnouncementInput] = useState(appSettings.competitionAnnouncement ?? "");
   const [termsInput, setTermsInput] = useState(appSettings.termsOfUseText ?? "");
+  const [poopcoinAmounts, setPoopcoinAmounts] = useState<Record<string, string>>({});
+  const [poopcoinReasons, setPoopcoinReasons] = useState<Record<string, string>>({});
+  const [reverseHash, setReverseHash] = useState("");
+  const [reverseReason, setReverseReason] = useState("");
 
   useEffect(() => {
     setCooldownInput(String(appSettings.cooldownMinutes));
@@ -167,6 +180,38 @@ export function AdminPage({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function runPoopcoinAdjustment(targetUser: AppUser) {
+    const amount = Number(poopcoinAmounts[targetUser.uid] ?? 0);
+    const reason = poopcoinReasons[targetUser.uid] ?? "";
+    await runAdminAction(
+      () => adjustPoopcoins(admin, targetUser, amount, reason),
+      "Poopcoins ajustados.",
+    );
+    setPoopcoinAmounts((current) => ({ ...current, [targetUser.uid]: "" }));
+    setPoopcoinReasons((current) => ({ ...current, [targetUser.uid]: "" }));
+  }
+
+  async function runPoopcoinMigration() {
+    await runAdminAction(
+      async () => {
+        const migrated = await migratePoopcoinsForLogs(admin, logs);
+        if (migrated === 0) {
+          throw new Error("Nenhum log pendente.");
+        }
+      },
+      "Lote de Poopcoins migrado.",
+    );
+  }
+
+  async function runPoopcoinReversal() {
+    await runAdminAction(
+      () => reversePoopcoinTransaction(admin, reverseHash, reverseReason),
+      "Transacao revertida.",
+    );
+    setReverseHash("");
+    setReverseReason("");
   }
 
   return (
@@ -497,9 +542,11 @@ export function AdminPage({
                         {user.isActive === false ? t("userInactive") : t("userActive")}
                       </span>
                     </div>
-                    <p className="text-xs text-fg-muted">{t("userPoints", { points: formatNumber(user.totalPoints) })}</p>
+                    <p className="text-xs text-fg-muted">
+                      {t("userPoints", { points: formatNumber(user.totalPoints) })} · {formatPoopcoins(user.poopcoinBalance)} PC
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <button
                       disabled={busy}
                       className="rounded-xl bg-panel px-3 py-2 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
@@ -555,6 +602,37 @@ export function AdminPage({
                     >
                       {user.isActive === false ? t("actions.reactivateUser") : t("actions.deactivateUser")}
                     </button>
+                    <input
+                      type="number"
+                      step={1}
+                      placeholder="+/- PC"
+                      className="w-24 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none"
+                      value={poopcoinAmounts[user.uid] ?? ""}
+                      onChange={(event) =>
+                        setPoopcoinAmounts((current) => ({ ...current, [user.uid]: event.target.value }))
+                      }
+                    />
+                    <input
+                      type="text"
+                      placeholder="Motivo"
+                      className="w-40 rounded-2xl border border-line/10 bg-field px-3 py-2 text-fg outline-none"
+                      value={poopcoinReasons[user.uid] ?? ""}
+                      onChange={(event) =>
+                        setPoopcoinReasons((current) => ({ ...current, [user.uid]: event.target.value }))
+                      }
+                    />
+                    <button
+                      disabled={
+                        busy ||
+                        !Number.isInteger(Number(poopcoinAmounts[user.uid])) ||
+                        Number(poopcoinAmounts[user.uid]) === 0 ||
+                        !poopcoinReasons[user.uid]?.trim()
+                      }
+                      className="rounded-xl bg-panel px-3 py-2 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
+                      onClick={() => void runPoopcoinAdjustment(user)}
+                    >
+                      Ajustar PC
+                    </button>
                   </div>
                 </div>
               ))}
@@ -590,6 +668,96 @@ export function AdminPage({
           </CollapsibleSection>
         </Card>
       </section>
+
+      <Card>
+        <CollapsibleSection
+          eyebrow="Poopcoins"
+          title="Ledger e reversoes"
+          description="Migre logs antigos, reverta transacoes por fraude comprovada e consulte os hashes recentes."
+        >
+          <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+            <label>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">Hash para reverter</span>
+              <input
+                className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 font-mono text-sm text-fg outline-none"
+                value={reverseHash}
+                onChange={(event) => setReverseHash(event.target.value)}
+                placeholder="Cole o hash da transacao"
+              />
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">Motivo da reversao</span>
+              <input
+                className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
+                value={reverseReason}
+                onChange={(event) => setReverseReason(event.target.value)}
+                placeholder="Fraude comprovada, erro operacional..."
+              />
+            </label>
+            <button
+              disabled={busy || !reverseHash.trim() || !reverseReason.trim()}
+              onClick={() => void runPoopcoinReversal()}
+              className="rounded-2xl bg-danger-soft/55 px-5 py-3 font-black text-danger transition hover:bg-danger-soft/75 disabled:opacity-60"
+            >
+              Reverter
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              disabled={busy}
+              onClick={() => void runPoopcoinMigration()}
+              className="rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg transition hover:bg-accent-strong disabled:opacity-60"
+            >
+              Migrar ate 25 logs antigos
+            </button>
+            <p className="text-sm text-fg-muted">
+              Pendentes neste carregamento: {logs.filter((log) => !log.poopcoinTransactionHash).length}
+            </p>
+          </div>
+
+          <div className="mt-5 max-h-[420px] space-y-3 overflow-auto pr-1">
+            {poopcoinTransactions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-line/15 p-8 text-center text-fg-muted">
+                Nenhuma transacao Poopcoin registrada ainda.
+              </div>
+            ) : (
+              poopcoinTransactions.slice(0, 30).map((transaction) => (
+                <div
+                  key={transaction.hash}
+                  className="grid gap-3 rounded-2xl border border-line/10 bg-panel-strong/40 p-4 md:grid-cols-[1fr_auto]"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-accent-soft/35 px-2 py-1 text-xs font-black text-accent-strong">
+                        #{transaction.sequence}
+                      </span>
+                      <span className="rounded-full bg-panel px-2 py-1 text-xs font-black text-fg-soft">
+                        {transaction.type}
+                      </span>
+                      {transaction.status === "reversed" ? (
+                        <span className="rounded-full bg-danger-soft/45 px-2 py-1 text-xs font-black text-danger">
+                          Revertida
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 truncate font-mono text-xs text-fg-muted" title={transaction.hash}>
+                      {transaction.hash}
+                    </p>
+                    {transaction.reason ? (
+                      <p className="mt-1 text-sm text-fg-muted">{transaction.reason}</p>
+                    ) : null}
+                  </div>
+                  <div className="text-left md:text-right">
+                    <p className="font-black text-accent-strong">{formatPoopcoins(transaction.amount)} PC</p>
+                    <p className="text-xs text-fg-muted">{formatDateTime(transaction.createdAt)}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CollapsibleSection>
+      </Card>
 
       <Card>
         <CollapsibleSection

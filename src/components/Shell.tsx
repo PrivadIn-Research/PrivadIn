@@ -1,4 +1,4 @@
-import { BarChart3, History, LayoutDashboard, LogOut, MessageCircle, Moon, Shield, Sun, User, Volume2, VolumeX } from "lucide-react";
+import { BarChart3, Coins, History, LayoutDashboard, LogOut, MessageCircle, Moon, Shield, Sun, User, Volume2, VolumeX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "../constants/app";
 import type { AppTheme, AppUser, AppView } from "../types";
@@ -17,21 +17,25 @@ interface ShellProps {
   children: React.ReactNode;
 }
 
+type NavItem = { view: AppView; label: string; icon: React.ElementType; mobile?: boolean };
+
 export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, children }: ShellProps) {
   const { t } = useTranslation(["common", "shell"]);
   const { logout } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
-  const items: Array<{ view: AppView; label: string; icon: React.ElementType }> = [
+  const items: NavItem[] = [
     { view: "dashboard", label: t("shell:nav.dashboard"), icon: LayoutDashboard },
-    { view: "history", label: t("shell:nav.history"), icon: History },
-    { view: "stats", label: t("shell:nav.stats"), icon: BarChart3 },
+    { view: "poopcoins", label: t("shell:nav.poopcoins"), icon: Coins },
     { view: "cuiter", label: t("shell:nav.cuiter"), icon: MessageCircle },
+    { view: "history", label: t("shell:nav.history"), icon: History },
+    { view: "stats", label: t("shell:nav.stats"), icon: BarChart3, mobile: false },
     { view: "profile", label: t("shell:nav.profile"), icon: User },
   ];
-  const navItems =
+  const navItems: NavItem[] =
     currentUser?.role === "admin"
       ? [...items, { view: "admin" as AppView, label: t("shell:nav.admin"), icon: Shield }]
       : items;
+  const mobileNavCount = navItems.filter((item) => item.mobile !== false).length;
   const themeOptions: Array<{ value: AppTheme; label: string; icon: React.ElementType }> = [
     { value: "light", label: t("common:theme.light"), icon: Sun },
     { value: "dark", label: t("common:theme.dark"), icon: Moon },
@@ -113,11 +117,14 @@ export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, c
           <nav
             className={clsx(
               "mobile-nav-safe fixed inset-x-3 bottom-0 z-30 grid gap-1 rounded-t-3xl border border-line/10 border-b-0 bg-panel/95 px-2 pt-2 shadow-panel backdrop-blur-xl sm:inset-x-6 md:static md:inset-x-auto md:bottom-auto md:order-2 md:gap-2 md:rounded-2xl md:border-b md:bg-panel/90 md:p-2 md:shadow-none lg:order-1 lg:h-fit lg:grid-cols-1 lg:gap-1.5 lg:p-1.5",
-              navItems.length === 6
-                ? "grid-cols-6 md:grid-cols-6"
-                : navItems.length === 5
-                  ? "grid-cols-5 md:grid-cols-5"
-                  : "grid-cols-4 md:grid-cols-4",
+              mobileNavCount === 6 ? "grid-cols-6" : mobileNavCount === 5 ? "grid-cols-5" : "grid-cols-4",
+              navItems.length === 7
+                ? "md:grid-cols-7"
+                : navItems.length === 6
+                  ? "md:grid-cols-6"
+                  : navItems.length === 5
+                    ? "md:grid-cols-5"
+                    : "md:grid-cols-4",
             )}
           >
               {navItems.map((item) => {
@@ -131,7 +138,8 @@ export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, c
                   aria-label={item.label}
                   title={item.label}
                   className={clsx(
-                    "flex min-h-[3.5rem] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1.5 py-2 text-[11px] font-bold transition md:min-h-14 md:flex-row md:justify-center md:gap-2 md:rounded-xl md:px-3 md:py-3 md:text-sm lg:min-h-[4.25rem] lg:flex-col lg:justify-center lg:gap-1 lg:px-2 lg:py-2.5 lg:text-xs",
+                    "min-h-[3.5rem] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1.5 py-2 text-[11px] font-bold transition md:min-h-14 md:flex-row md:justify-center md:gap-2 md:rounded-xl md:px-3 md:py-3 md:text-sm lg:min-h-[4.25rem] lg:flex-col lg:justify-center lg:gap-1 lg:px-2 lg:py-2.5 lg:text-xs",
+                    item.mobile === false ? "hidden md:flex" : "flex",
                     active
                       ? "bg-accent text-accent-fg shadow-accent"
                       : "text-fg-muted hover:bg-panel-strong hover:text-fg",

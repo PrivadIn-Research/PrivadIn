@@ -6,6 +6,7 @@ import {
   useAdminAuditLogs,
   useAllLogs,
   useAppSettings,
+  usePoopcoinTransactions,
   useRegistrationAttempts,
   useRegistrationRequests,
   useUserLogs,
@@ -20,6 +21,7 @@ import { StatsPage } from "./pages/StatsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { EditProfilePage } from "./pages/EditProfilePage";
 import { CuiterPage } from "./pages/CuiterPage";
+import { PoopcoinsPage } from "./pages/PoopcoinsPage";
 import { useTheme } from "./hooks/useTheme";
 import type { AppView } from "./types";
 
@@ -34,6 +36,7 @@ function AppContent() {
     Boolean(user) && view !== "admin" && view !== "profile",
   );
   const allLogs = useAllLogs(view === "stats" || view === "admin");
+  const poopcoinTransactions = usePoopcoinTransactions(Boolean(user) && (view === "poopcoins" || view === "admin"));
   const { muted, toggleMuted, playFlush } = useSound();
 
   const liveUser = useMemo(() => {
@@ -89,9 +92,10 @@ function AppContent() {
         />
       ) : null}
       {view === "profile" ? <EditProfilePage user={liveUser} appSettings={appSettings} /> : null}
+      {view === "poopcoins" ? <PoopcoinsPage user={liveUser} users={users} transactions={poopcoinTransactions} /> : null}
       {view === "history" ? <HistoryPage logs={userLogs} /> : null}
       {view === "stats" ? <StatsPage user={liveUser} logs={userLogs} allLogs={allLogs} rankedUsers={rankedUsers} overallRankingVisible={appSettings.overallRankingVisible === true} /> : null}
-      {view === "cuiter" ? <CuiterPage user={liveUser} userLogs={userLogs} users={users} /> : null}
+      {view === "cuiter" ? <CuiterPage user={liveUser} users={users} /> : null}
       {view === "admin" && liveUser.role === "admin" ? (
         <AdminPage
           admin={liveUser}
@@ -101,6 +105,7 @@ function AppContent() {
           auditLogs={adminAuditLogs}
           registrationRequests={registrationRequests}
           registrationAttempts={registrationAttempts}
+          poopcoinTransactions={poopcoinTransactions}
         />
       ) : null}
     </Shell>

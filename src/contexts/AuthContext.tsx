@@ -117,6 +117,7 @@ async function ensureUserProfile(firebaseUser: User) {
       cooldownUntil: null,
       bathroomDurationMinutes: 10,
       isActive: true,
+      poopcoinBalance: 0,
       createdAt: serverTimestamp(),
     });
   }

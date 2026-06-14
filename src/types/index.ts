@@ -3,7 +3,7 @@ import type { Timestamp } from "@firebase/firestore";
 export type AppLanguage = "pt-BR" | "en-US" | "es-ES" | "zh-Hans" | "ar" | "jam-JM" | "pap-CW";
 export type AppTheme = "light" | "dark";
 
-export type AppView = "dashboard" | "history" | "stats" | "cuiter" | "admin" | "profile";
+export type AppView = "dashboard" | "poopcoins" | "history" | "stats" | "cuiter" | "admin" | "profile";
 
 export type UserRole = "player" | "admin";
 
@@ -46,6 +46,8 @@ export interface AppUser {
   isActive?: boolean;
   deactivatedAt?: Timestamp;
   deactivatedBy?: string;
+  poopcoinBalance?: number;
+  poopcoinMigratedAt?: Timestamp;
 }
 
 export interface PoopLog {
@@ -60,6 +62,7 @@ export interface PoopLog {
   localTime?: string;
   durationMinutes?: number;
   competitionEdition?: number;
+  poopcoinTransactionHash?: string;
 }
 
 export interface CuiterPost {
@@ -68,6 +71,45 @@ export interface CuiterPost {
   userName: string;
   message: string;
   createdAt: Timestamp;
+  poopcoinTransactionHash?: string;
+}
+
+export type PoopcoinTransactionType =
+  | "mint_log"
+  | "legacy_mint"
+  | "transfer"
+  | "cuiter_spend"
+  | "admin_adjustment"
+  | "reversal";
+
+export type PoopcoinTransactionStatus = "active" | "reversed";
+
+export interface PoopcoinTransactionEntry {
+  userId: string;
+  delta: number;
+}
+
+export interface PoopcoinTransaction {
+  id: string;
+  hash: string;
+  previousHash: string;
+  sequence: number;
+  createdAt: Timestamp;
+  type: PoopcoinTransactionType;
+  entries: PoopcoinTransactionEntry[];
+  affectedUserIds: string[];
+  fromUserId?: string | null;
+  toUserId?: string | null;
+  amount: number;
+  createdBy: string;
+  createdByRole: UserRole;
+  status: PoopcoinTransactionStatus;
+  reversesTransactionHash?: string | null;
+  reversedByTransactionHash?: string | null;
+  linkedLogId?: string | null;
+  linkedPostId?: string | null;
+  reason?: string | null;
+  nonce: string;
 }
 
 export interface AppSettings {
@@ -106,7 +148,10 @@ export type AdminAuditAction =
   | "update_terms_of_use"
   | "deactivate_user"
   | "reactivate_user"
-  | "update_competition_announcement";
+  | "update_competition_announcement"
+  | "adjust_poopcoins"
+  | "reverse_poopcoin_transaction"
+  | "migrate_poopcoins";
 
 export interface AdminAuditLog {
   id: string;
@@ -123,6 +168,8 @@ export interface AdminAuditLog {
   cooldownMinutes?: number | null;
   pointsPerLog?: number | null;
   edition?: number | null;
+  poopcoins?: number | null;
+  poopcoinTransactionHash?: string | null;
   createdAt: Timestamp;
   /** @deprecated Mensagens antigas; novas entradas usam action + ids */
   description?: string;

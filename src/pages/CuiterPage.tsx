@@ -1,31 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
-import { Timestamp, type DocumentData, type QueryDocumentSnapshot } from "@firebase/firestore";
+import { type DocumentData, type QueryDocumentSnapshot } from "@firebase/firestore";
 import { FirebaseError } from "@firebase/app";
 import toast from "react-hot-toast";
 import { MessageCircle, Send } from "lucide-react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { Card } from "../components/Card";
 import {
   CUITER_MAX_CHARS,
-  CUITER_CREDIT_START_DATE,
   canPostOnCuiter,
-  countUserCuiterPosts,
   createCuiterPost,
   fetchCuiterPostsPage,
   getCuiterAvailableCredits,
-  isCuiterCreditEligibleLog,
 } from "../services/cuiterService";
-import type { AppUser, CuiterPost, PoopLog } from "../types";
-import { formatDateTime, formatTimeAgo, toDate } from "../utils/date";
+import type { AppUser, CuiterPost } from "../types";
+import { formatTimeAgo } from "../utils/date";
 import { countGraphemes, sliceGraphemes } from "../utils/grapheme";
 
 export function CuiterPage({
   user,
-  userLogs,
   users,
 }: {
   user: AppUser;
-  userLogs: PoopLog[];
   users: AppUser[];
 }) {
   const { t } = useTranslation("cuiter");
@@ -36,16 +31,11 @@ export function CuiterPage({
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [userPostsCount, setUserPostsCount] = useState(0);
   const usersById = useMemo(() => new Map(users.map((candidate) => [candidate.uid, candidate])), [users]);
   const charsCount = countGraphemes(message);
   const charsRemaining = CUITER_MAX_CHARS - charsCount;
-  const eligibleLogsCount = userLogs.filter((log) => {
-    const createdAtMs = toDate(log.createdAt)?.getTime();
-    return typeof createdAtMs === "number" ? isCuiterCreditEligibleLog(createdAtMs) : false;
-  }).length;
-  const availableCredits = getCuiterAvailableCredits(eligibleLogsCount, userPostsCount);
-  const unlocked = canPostOnCuiter(user, eligibleLogsCount, userPostsCount);
+  const availableCredits = getCuiterAvailableCredits(user);
+  const unlocked = canPostOnCuiter(user);
   const canPublish = unlocked && !sending && charsCount > 0 && charsCount <= CUITER_MAX_CHARS;
 
   function isFirestorePermissionDenied(error: unknown): error is FirebaseError {
@@ -69,14 +59,6 @@ export function CuiterPage({
       setPosts(page.posts);
       setCursor(page.nextCursor);
       setHasMore(page.hasMore);
-
-      try {
-        const myPostsCount = await countUserCuiterPosts(user.uid);
-        setUserPostsCount(myPostsCount);
-      } catch {
-        setUserPostsCount(0);
-        toast.error(t("loadUserPostsError"));
-      }
     } catch {
       toast.error(t("loadFeedError"));
     } finally {
@@ -107,15 +89,8 @@ export function CuiterPage({
     if (!canPublish) return;
     setSending(true);
     try {
-      const post = await createCuiterPost(user, message, eligibleLogsCount);
+      const post = await createCuiterPost(user, message);
       setPosts((current) => [post, ...current]);
-
-      try {
-        const myPostsCount = await countUserCuiterPosts(user.uid);
-        setUserPostsCount(myPostsCount);
-      } catch {
-        setUserPostsCount((current) => current + 1);
-      }
 
       setMessage("");
       toast.success(t("publishSuccess"));
@@ -149,11 +124,7 @@ export function CuiterPage({
         <div className="space-y-3">
           {!unlocked ? (
             <div className="rounded-2xl border border-accent/25 bg-accent-soft/30 p-3 text-sm text-accent-strong">
-              <Trans
-                i18nKey="cuiter:unlockInfo"
-                values={{ date: formatDateTime(Timestamp.fromDate(CUITER_CREDIT_START_DATE)) }}
-                components={{ strong: <strong /> }}
-              />
+              {t("unlockInfo")}
             </div>
           ) : null}
 

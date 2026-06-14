@@ -19,21 +19,17 @@ export function StatsPage({
   rankedUsers: RankedUser[];
 }) {
   const { t } = useTranslation("stats");
-  const king = rankedUsers[0];
   const streakLeader = [...rankedUsers].sort((a, b) => b.bestStreak - a.bestStreak)[0];
   const weeklyTotal = rankedUsers.reduce((sum, ranked) => sum + ranked.weeklyPoints, 0);
   const achievements = getAchievements(user, logs);
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
-        <MetricCard icon="👑" label={t("metric.king")} value={king?.name ?? "-"} hint={t("metric.kingHint", { points: formatNumber(king?.totalPoints ?? 0) })} />
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <MetricCard icon="🔥" label={t("metric.streakLeader")} value={formatNumber(streakLeader?.bestStreak ?? 0)} hint={streakLeader?.name ?? t("metric.streakLeaderFallback")} />
         <MetricCard icon="🚽" label={t("metric.productiveHour")} value={getProductiveHour(allLogs)} hint={t("metric.productiveHourHint")} />
         <MetricCard icon="📈" label={t("metric.weeklyTotal")} value={formatNumber(weeklyTotal)} hint={t("metric.weeklyTotalHint")} />
-        <div className="col-span-2 xl:col-span-1">
-          <MetricCard icon="⚖️" label={t("metric.dailyAverage")} value={formatDecimal(getDailyAverage(logs))} hint={t("metric.dailyAverageHint")} />
-        </div>
+        <MetricCard icon="⚖️" label={t("metric.dailyAverage")} value={formatDecimal(getDailyAverage(logs))} hint={t("metric.dailyAverageHint")} />
       </section>
 
       <section className="grid gap-4 sm:gap-5 xl:grid-cols-[1fr_360px]">

@@ -21,9 +21,11 @@ import { formatDateTime, formatTimeAgo, toDate } from "../utils/date";
 export function CuiterPage({
   user,
   userLogs,
+  users,
 }: {
   user: AppUser;
   userLogs: PoopLog[];
+  users: AppUser[];
 }) {
   const { t } = useTranslation("cuiter");
   const [message, setMessage] = useState("");
@@ -34,6 +36,7 @@ export function CuiterPage({
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [userPostsCount, setUserPostsCount] = useState(0);
+  const usersById = useMemo(() => new Map(users.map((candidate) => [candidate.uid, candidate])), [users]);
   const charsCount = [...message].length;
   const charsRemaining = CUITER_MAX_CHARS - charsCount;
   const eligibleLogsCount = userLogs.filter((log) => {
@@ -126,6 +129,11 @@ export function CuiterPage({
     }
   }
 
+  function resolvePostAuthor(post: CuiterPost) {
+    const author = usersById.get(post.userId);
+    return author?.nickname?.trim() || author?.name || post.userName;
+  }
+
   return (
     <div className="space-y-4 sm:space-y-5">
       <Card>
@@ -191,7 +199,7 @@ export function CuiterPage({
               <article key={post.id} className="rounded-2xl border border-line/10 bg-panel-strong/40 p-4">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <p className="truncate text-sm font-black text-fg">
-                    {post.userName}
+                    {resolvePostAuthor(post)}
                   </p>
                   <p className="shrink-0 text-xs text-fg-muted">{formatTimeAgo(post.createdAt)}</p>
                 </div>

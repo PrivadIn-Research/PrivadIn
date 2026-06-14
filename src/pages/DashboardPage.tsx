@@ -12,7 +12,7 @@ import { toRoman } from "../utils/roman";
 import { requestCurrentLocation } from "../services/locationService";
 import { registerPoopWithValidation } from "../services/poopService";
 import { createWeeklyRankingShareFile, RANKING_LIMIT } from "../utils/weeklyRankingShare";
-
+import { isRegisterPoopError } from "../utils/registerPoopError";
 
 export function DashboardPage({
   user,
@@ -23,6 +23,7 @@ export function DashboardPage({
   edition,
   competitionAnnouncement,
   onPlaySound,
+  onOpenProfile,
 }: {
   user: AppUser;
   rankedUsers: RankedUser[];
@@ -32,6 +33,7 @@ export function DashboardPage({
   edition: number;
   competitionAnnouncement: string;
   onPlaySound: () => void;
+  onOpenProfile: () => void;
 }) {
   const { t } = useTranslation(["dashboard", "common"]);
   const currentRank = rankedUsers.find((ranked) => ranked.uid === user.uid);
@@ -56,17 +58,35 @@ export function DashboardPage({
     }
     setIsRegistering(true);
 
-    const previousRank = currentRank?.rank ?? rankedUsers.length;
+    const previousRank = currentRank?.weeklyRank ?? rankedUsers.length;
     try {
       const location = await requestCurrentLocation();
       await registerPoopWithValidation(user, userLogs, location, cooldownMinutes, pointsPerLog);
       onPlaySound();
       toast.success(t("registerSuccess"));
-      if ((currentRank?.rank ?? previousRank) <= previousRank) {
+      if ((currentRank?.weeklyRank ?? previousRank) <= previousRank) {
         confetti({ particleCount: 140, spread: 75, origin: { y: 0.72 }, colors: ["#fde047", "#f59e0b", "#14b8a6"] });
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("genericRegisterError"));
+      if (isRegisterPoopError(error) && error.resolutionTarget === "profile") {
+        toast((toastInstance) => (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-fg">{error.message}</p>
+            <button
+              type="button"
+              className="rounded-xl bg-accent px-3 py-2 text-sm font-black text-accent-fg transition hover:bg-accent-strong"
+              onClick={() => {
+                toast.dismiss(toastInstance.id);
+                onOpenProfile();
+              }}
+            >
+              {t("resolveProfileAction")}
+            </button>
+          </div>
+        ));
+      } else {
+        toast.error(error instanceof Error ? error.message : t("genericRegisterError"));
+      }
     } finally {
       setIsRegistering(false);
     }
@@ -134,7 +154,7 @@ export function DashboardPage({
 
       <section className="order-3 grid grid-cols-2 gap-3 sm:gap-4 md:order-1 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon="💩" label={t("metric.total")} value={formatNumber(user.totalPoints)} hint={t("metric.totalHint", { points: formattedPointsPerLog })} />
-        <MetricCard icon="🏆" label={t("metric.rank")} value={`#${currentRank?.rank ?? "-"}`} hint={t("metric.rankHint")} />
+        <MetricCard icon="📊" label={t("metric.weeklyPoints")} value={formatNumber(user.weeklyPoints)} hint={t("metric.weeklyPointsHint")} />
         <MetricCard icon="🔥" label={t("metric.streak")} value={`${user.currentDailyStreak}d`} hint={t("metric.streakHint", { count: user.currentWeeklyStreak })} />
         <MetricCard icon="🕘" label={t("metric.lastLog")} value={formatHour(lastLog?.createdAt)} hint={formatDateTime(lastLog?.createdAt)} />
       </section>
@@ -174,7 +194,7 @@ export function DashboardPage({
         </Card>
       </section>
 
-      <section className="order-2 grid gap-4 sm:gap-5 xl:grid-cols-2">
+      <section className="order-2">
         <Card>
           <div className="mb-4">
             <p className="text-sm font-bold text-accent-strong">{t("weeklyEyebrow", { count: countThisWeek(userLogs) })}</p>
@@ -182,26 +202,16 @@ export function DashboardPage({
           </div>
           <RankingList users={rankedUsers} mode="weekly" currentUid={user.uid} />
           <button
-              onClick={handleShareRanking}
-              disabled={isSharingRanking}
-              className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-accent-soft/35 px-4 py-3 text-sm font-black text-accent-strong transition sm:w-auto ${
-                isSharingRanking ? "cursor-wait opacity-70" : "hover:bg-accent hover:text-accent-fg"
-              }`}
-              title={t("shareTitle")}
-            >
-              {isSharingRanking ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
-              {t("shareAction")}
-            </button>
-        </Card>
-        <Card>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold text-accent-strong">{t("overallEyebrow")}</p>
-              <h2 className="text-2xl font-black text-fg">{t("overallTitle")}</h2>
-            </div>
-            
-          </div>
-          <RankingList users={rankedUsers} currentUid={user.uid} />
+            onClick={handleShareRanking}
+            disabled={isSharingRanking}
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-accent-soft/35 px-4 py-3 text-sm font-black text-accent-strong transition sm:w-auto ${
+              isSharingRanking ? "cursor-wait opacity-70" : "hover:bg-accent hover:text-accent-fg"
+            }`}
+            title={t("shareTitle")}
+          >
+            {isSharingRanking ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
+            {t("shareAction")}
+          </button>
         </Card>
       </section>
     </div>

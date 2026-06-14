@@ -18,18 +18,20 @@ import { db } from "./firebase";
 import type { AdminAuditAction, AppUser, BonusTimeRange, PoopLocation, PoopLog } from "../types";
 import {
   DAILY_LIMIT,
-  countToday,
-  getCooldownSeconds,
   calculateDailyStreak,
   calculateWeeklyStreak,
+  countToday,
+  getCooldownSeconds,
 } from "../utils/date";
 import {
   assertActiveWorkTime,
+  hasCompleteWorkSchedule,
   isBetweenMinutes,
   minutesOfDay,
   resolveWorkSchedule,
 } from "../utils/workSchedule";
 import i18n from "../i18n";
+import { RegisterPoopError } from "../utils/registerPoopError";
 
 export const usersRef = collection(db, "users");
 export const logsRef = collection(db, "poop_logs");
@@ -119,11 +121,11 @@ function assertLocation(location: PoopLocation) {
   const accuracy = location.accuracy == null ? null : Number(location.accuracy);
 
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
-    throw new Error("Latitude inválida.");
+    throw new RegisterPoopError("location_invalid", "Latitude invalida.");
   }
 
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-    throw new Error("Longitude inválida.");
+    throw new RegisterPoopError("location_invalid", "Longitude invalida.");
   }
 
   return {
@@ -141,26 +143,45 @@ export async function registerPoopWithValidation(
   pointsPerLog: number,
 ) {
   if (user.isActive === false) {
-    throw new Error(i18n.t("auth:deactivated_user"));
+    throw new RegisterPoopError("deactivated_user", i18n.t("auth:deactivated_user"));
   }
 
   if (user.termsAccepted !== true) {
-    throw new Error("Aceite os termos de uso e privacidade antes de registrar.");
+    throw new RegisterPoopError(
+      "missing_terms",
+      i18n.t("services:poop.missingTerms"),
+      "profile",
+    );
+  }
+
+  if (!hasCompleteWorkSchedule(user.workSchedule)) {
+    throw new RegisterPoopError(
+      "missing_work_schedule",
+      i18n.t("services:poop.missingWorkSchedule"),
+      "profile",
+    );
   }
 
   const cooldown = getCooldownSeconds(userLogs, cooldownMinutes);
   if (cooldown > 0) {
-    throw new Error(i18n.t("services:poop.cooldown", { count: Math.ceil(cooldown / 60) }));
+    throw new RegisterPoopError(
+      "cooldown",
+      i18n.t("services:poop.cooldown", { count: Math.ceil(cooldown / 60) }),
+    );
   }
 
   if (user.cooldownUntil && user.cooldownUntil.toMillis() > Date.now()) {
-    throw new Error(
-      `Usuário em cooldown até ${user.cooldownUntil.toDate().toLocaleString("pt-BR")}.`,
+    throw new RegisterPoopError(
+      "cooldown",
+      `Usuario em cooldown ate ${user.cooldownUntil.toDate().toLocaleString("pt-BR")}.`,
     );
   }
 
   if (countToday(userLogs) >= DAILY_LIMIT) {
-    throw new Error(i18n.t("services:poop.dailyLimit", { count: DAILY_LIMIT }));
+    throw new RegisterPoopError(
+      "daily_limit",
+      i18n.t("services:poop.dailyLimit", { count: DAILY_LIMIT }),
+    );
   }
 
   const validatedLocation = assertLocation(location);
@@ -178,7 +199,15 @@ export async function registerPoopWithValidation(
     ]);
     const currentUser = userSnapshot.data() as AppUser | undefined;
     if (!currentUser) {
-      throw new Error("Perfil do usuário não encontrado.");
+      throw new RegisterPoopError("invalid_work_schedule", "Perfil do usuario nao encontrado.");
+    }
+
+    if (!hasCompleteWorkSchedule(currentUser.workSchedule)) {
+      throw new RegisterPoopError(
+        "missing_work_schedule",
+        i18n.t("services:poop.missingWorkSchedule"),
+        "profile",
+      );
     }
 
     const settings = settingsSnapshot.data();
@@ -229,16 +258,22 @@ export async function registerPoop(
   pointsPerLog: number,
 ) {
   if (user.isActive === false) {
-    throw new Error(i18n.t("auth:deactivated_user"));
+    throw new RegisterPoopError("deactivated_user", i18n.t("auth:deactivated_user"));
   }
 
   const cooldown = getCooldownSeconds(userLogs, cooldownMinutes);
   if (cooldown > 0) {
-    throw new Error(i18n.t("services:poop.cooldown", { count: Math.ceil(cooldown / 60) }));
+    throw new RegisterPoopError(
+      "cooldown",
+      i18n.t("services:poop.cooldown", { count: Math.ceil(cooldown / 60) }),
+    );
   }
 
   if (countToday(userLogs) >= DAILY_LIMIT) {
-    throw new Error(i18n.t("services:poop.dailyLimit", { count: DAILY_LIMIT }));
+    throw new RegisterPoopError(
+      "daily_limit",
+      i18n.t("services:poop.dailyLimit", { count: DAILY_LIMIT }),
+    );
   }
 
   const now = Timestamp.now();

@@ -1,4 +1,5 @@
 import type { WorkSchedule } from "../types";
+import { RegisterPoopError } from "./registerPoopError";
 
 export const DEFAULT_WORK_SCHEDULE: WorkSchedule = {
   horarioInicioExpediente: "09:00",
@@ -23,6 +24,22 @@ export function resolveWorkSchedule(raw?: Partial<WorkSchedule> | null): WorkSch
     timezone:
       typeof raw?.timezone === "string" && raw.timezone ? raw.timezone : DEFAULT_WORK_SCHEDULE.timezone,
   };
+}
+
+export function hasCompleteWorkSchedule(raw?: Partial<WorkSchedule> | null) {
+  return Boolean(
+    raw &&
+      typeof raw.horarioInicioExpediente === "string" &&
+      /^\d{2}:\d{2}$/.test(raw.horarioInicioExpediente) &&
+      typeof raw.horarioFimExpediente === "string" &&
+      /^\d{2}:\d{2}$/.test(raw.horarioFimExpediente) &&
+      typeof raw.horarioInicioAlmoco === "string" &&
+      /^\d{2}:\d{2}$/.test(raw.horarioInicioAlmoco) &&
+      typeof raw.horarioFimAlmoco === "string" &&
+      /^\d{2}:\d{2}$/.test(raw.horarioFimAlmoco) &&
+      typeof raw.timezone === "string" &&
+      raw.timezone.trim(),
+  );
 }
 
 export function minutesOfDay(value: string) {
@@ -54,11 +71,11 @@ export function assertActiveWorkTime(schedule: WorkSchedule, now: Date) {
   const lunchEnd = minutesOfDay(schedule.horarioFimAlmoco);
 
   if (!isBetweenMinutes(current, workStart, workEnd)) {
-    throw new Error("Registro bloqueado fora do horário de expediente.");
+    throw new RegisterPoopError("outside_work_hours", "Registro bloqueado fora do horario de expediente.");
   }
 
   if (isBetweenMinutes(current, lunchStart, lunchEnd)) {
-    throw new Error("Registro bloqueado durante o horário de almoço.");
+    throw new RegisterPoopError("lunch_break", "Registro bloqueado durante o horario de almoco.");
   }
 
   return localTime;

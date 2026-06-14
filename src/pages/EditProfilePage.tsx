@@ -20,7 +20,7 @@ import { dailyWorkMinutes, resolveWorkSchedule } from "../utils/workSchedule";
 
 type AvatarStatus = "idle" | "checking" | "valid" | "invalid";
 type AvatarAction = "keep" | "manual" | "upload" | "default";
-type UpdateCheckStatus = "idle" | "checking" | "available" | "unavailable" | "error";
+type UpdateCheckStatus = "idle" | "checking" | "available" | "pending" | "unavailable" | "error";
 
 const salaryStorageKey = (uid: string) => `privadin:monthlySalaryCents:${uid}`;
 
@@ -121,16 +121,6 @@ export function EditProfilePage({ user }: { user: AppUser }) {
   useEffect(() => {
     void refreshSalarySummary();
   }, [user.uid]);
-
-  useEffect(() => {
-    if (updateCheckStatus === "available") {
-      const timeout = setTimeout(() => {
-        triggerPWAUpdate();
-      }, 1500);
-
-      return () => clearTimeout(timeout);
-    }
-  }, [updateCheckStatus]);
 
   useEffect(() => {
     return () => {
@@ -418,8 +408,13 @@ export function EditProfilePage({ user }: { user: AppUser }) {
 
       if (result.hasUpdate && result.latestVersion) {
         setLatestVersion(result.latestVersion);
-        setUpdateCheckStatus("available");
-        toast.success(t("updateAvailable", { newVersion: result.latestVersion }));
+        const updateResult = await triggerPWAUpdate();
+        setUpdateCheckStatus(updateResult === "reloading" ? "available" : "pending");
+        toast.success(
+          updateResult === "reloading"
+            ? t("updateAvailable", { newVersion: result.latestVersion })
+            : t("updatePreparing", { newVersion: result.latestVersion }),
+        );
       } else {
         setUpdateCheckStatus("unavailable");
         toast.success(t("updateNotAvailable"));
@@ -808,6 +803,14 @@ export function EditProfilePage({ user }: { user: AppUser }) {
             <div className="rounded-lg border border-success/35 bg-success-soft/45 p-3">
               <p className="text-sm font-semibold text-success">
                 {t("updateAvailable", { newVersion: latestVersion })}
+              </p>
+            </div>
+          )}
+
+          {updateCheckStatus === "pending" && latestVersion && (
+            <div className="rounded-lg border border-accent/35 bg-accent-soft/30 p-3">
+              <p className="text-sm font-semibold text-accent-strong">
+                {t("updatePreparing", { newVersion: latestVersion })}
               </p>
             </div>
           )}

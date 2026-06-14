@@ -7,6 +7,8 @@ export interface UpdateCheckResult {
   error: string | null;
 }
 
+export type TriggerPWAUpdateResult = "reloading" | "pending";
+
 /**
  * Checks for PWA updates by comparing current version with latest available
  * Fetches from /version.json which is served from the public/ folder
@@ -15,10 +17,7 @@ export interface UpdateCheckResult {
 export async function checkForUpdates(): Promise<UpdateCheckResult> {
   try {
     const currentVersion = appVersion;
-
-    // Fetch the latest version from version.json served from public/ folder
-    // This file is copied to the dist/ output during build
-    const response = await fetch("/version.json", {
+    const response = await fetch(`/version.json?ts=${Date.now()}`, {
       cache: "no-store",
       headers: {
         "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -36,7 +35,6 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
 
     const versionData = await response.json();
 
-    // Validate version.json structure
     if (
       !versionData ||
       typeof versionData.version !== "string" ||
@@ -52,7 +50,6 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
 
     const latestVersion = versionData.version.trim();
 
-    // Simple semver comparison (works for versions like 1.0.5)
     const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
 
     return {
@@ -94,45 +91,81 @@ function compareVersions(v1: string, v2: string): number {
   return 0;
 }
 
-/**
- * Triggers PWA update using targeted service worker update flow
- * 1. Checks for a waiting service worker (new version)
- * 2. Tells it to skip waiting (take control)
- * 3. Reloads once the new controller is active
- */
-export async function triggerPWAUpdate(): Promise<void> {
-  try {
-    if ("serviceWorker" in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
+const UPDATE_WAIT_TIMEOUT_MS = 8000;
 
-      for (const registration of registrations) {
-        // Check if there's a waiting worker (new version ready)
-        if (registration.waiting) {
-          // Tell the waiting worker to skip waiting and take control
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
-
-          // Reload once the new worker takes control
-          let isReloading = false;
-          navigator.serviceWorker.oncontrollerchange = () => {
-            if (!isReloading) {
-              isReloading = true;
-              window.location.reload();
-            }
-          };
-        } else {
-          // No waiting worker yet, check for updates
-          await registration.update();
-        }
-      }
-    } else {
-      // Fallback: just reload if no service worker support
+function waitForControllerChange() {
+  return new Promise<void>((resolve) => {
+    let reloaded = false;
+    const handleControllerChange = () => {
+      if (reloaded) return;
+      reloaded = true;
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      resolve();
       window.location.reload();
-    }
-  } catch (error) {
-    console.error("Error updating PWA service worker:", error);
-    // Fallback to page reload on error
-    window.location.reload();
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+    window.setTimeout(() => {
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      resolve();
+    }, UPDATE_WAIT_TIMEOUT_MS);
+  });
+}
+
+function waitForWorkerReady(registration: ServiceWorkerRegistration) {
+  if (registration.waiting) {
+    return Promise.resolve(registration.waiting);
   }
+
+  return new Promise<ServiceWorker | null>((resolve) => {
+    const timeoutId = window.setTimeout(() => resolve(registration.waiting ?? null), UPDATE_WAIT_TIMEOUT_MS);
+
+    const observeWorker = (worker: ServiceWorker | null) => {
+      if (!worker) return;
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "installed" || worker.state === "activated") {
+          window.clearTimeout(timeoutId);
+          resolve(registration.waiting ?? worker);
+        }
+      });
+    };
+
+    observeWorker(registration.installing);
+    registration.addEventListener("updatefound", () => {
+      observeWorker(registration.installing);
+    });
+  });
+}
+
+export async function triggerPWAUpdate(): Promise<TriggerPWAUpdateResult> {
+  if (!("serviceWorker" in navigator)) {
+    window.location.reload();
+    return "reloading";
+  }
+
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  if (registrations.length === 0) {
+    window.location.reload();
+    return "reloading";
+  }
+
+  for (const registration of registrations) {
+    const readyWorkerBeforeUpdate = registration.waiting ?? registration.installing;
+    if (!readyWorkerBeforeUpdate) {
+      await registration.update();
+    }
+
+    const worker = await waitForWorkerReady(registration);
+    if (!worker) {
+      continue;
+    }
+
+    worker.postMessage({ type: "SKIP_WAITING" });
+    await waitForControllerChange();
+    return "reloading";
+  }
+
+  return "pending";
 }
 
 /**

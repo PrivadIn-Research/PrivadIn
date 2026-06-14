@@ -20,7 +20,7 @@ import { dailyWorkMinutes, resolveWorkSchedule } from "../utils/workSchedule";
 
 type AvatarStatus = "idle" | "checking" | "valid" | "invalid";
 type AvatarAction = "keep" | "manual" | "upload" | "default";
-type UpdateCheckStatus = "idle" | "checking" | "available" | "pending" | "unavailable" | "error";
+type UpdateCheckStatus = "idle" | "checking" | "available" | "applying" | "pending" | "unavailable" | "error";
 
 const salaryStorageKey = (uid: string) => `privadin:monthlySalaryCents:${uid}`;
 
@@ -408,17 +408,28 @@ export function EditProfilePage({ user }: { user: AppUser }) {
 
       if (result.hasUpdate && result.latestVersion) {
         setLatestVersion(result.latestVersion);
-        const updateResult = await triggerPWAUpdate();
-        setUpdateCheckStatus(updateResult === "reloading" ? "available" : "pending");
-        toast.success(
-          updateResult === "reloading"
-            ? t("updateAvailable", { newVersion: result.latestVersion })
-            : t("updatePreparing", { newVersion: result.latestVersion }),
-        );
+        setUpdateCheckStatus("available");
+        toast.success(t("updateAvailable", { newVersion: result.latestVersion }));
       } else {
         setUpdateCheckStatus("unavailable");
         toast.success(t("updateNotAvailable"));
       }
+    } catch (error) {
+      console.error(error);
+      setUpdateCheckStatus("error");
+      toast.error(t("updateCheckError"));
+    }
+  }
+
+  async function handleApplyUpdate() {
+    if (!latestVersion) return;
+
+    setUpdateCheckStatus("applying");
+
+    try {
+      const updateResult = await triggerPWAUpdate();
+      setUpdateCheckStatus(updateResult === "reloading" ? "pending" : "pending");
+      toast.success(t("updatePreparing", { newVersion: latestVersion }));
     } catch (error) {
       console.error(error);
       setUpdateCheckStatus("error");
@@ -784,20 +795,39 @@ export function EditProfilePage({ user }: { user: AppUser }) {
             </p>
           </div>
 
-          <button
-            onClick={() => void handleCheckUpdates()}
-            disabled={updateCheckStatus === "checking" || busy}
-            className="w-full rounded-2xl bg-panel-strong px-5 py-3 font-black text-fg hover:bg-panel-subtle disabled:opacity-60 sm:w-auto"
-          >
-            {updateCheckStatus === "checking" ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-fg border-t-transparent" />
-                {t("checkUpdatesLoading")}
-              </span>
-            ) : (
-              t("checkUpdatesButton")
-            )}
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() => void handleCheckUpdates()}
+              disabled={updateCheckStatus === "checking" || updateCheckStatus === "applying" || busy}
+              className="w-full rounded-2xl bg-panel-strong px-5 py-3 font-black text-fg hover:bg-panel-subtle disabled:opacity-60 sm:w-auto"
+            >
+              {updateCheckStatus === "checking" ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-fg border-t-transparent" />
+                  {t("checkUpdatesLoading")}
+                </span>
+              ) : (
+                t("checkUpdatesButton")
+              )}
+            </button>
+
+            {latestVersion && (updateCheckStatus === "available" || updateCheckStatus === "applying") ? (
+              <button
+                onClick={() => void handleApplyUpdate()}
+                disabled={updateCheckStatus === "applying" || busy}
+                className="w-full rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60 sm:w-auto"
+              >
+                {updateCheckStatus === "applying" ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-accent-fg border-t-transparent" />
+                    {t("applyUpdateLoading")}
+                  </span>
+                ) : (
+                  t("applyUpdateButton", { version: latestVersion })
+                )}
+              </button>
+            ) : null}
+          </div>
 
           {updateCheckStatus === "available" && latestVersion && (
             <div className="rounded-lg border border-success/35 bg-success-soft/45 p-3">

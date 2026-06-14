@@ -22,6 +22,7 @@ export function DashboardPage({
   pointsPerLog,
   edition,
   competitionAnnouncement,
+  overallRankingVisible,
   onPlaySound,
   onOpenProfile,
 }: {
@@ -32,6 +33,7 @@ export function DashboardPage({
   pointsPerLog: number;
   edition: number;
   competitionAnnouncement: string;
+  overallRankingVisible: boolean;
   onPlaySound: () => void;
   onOpenProfile: () => void;
 }) {
@@ -194,7 +196,7 @@ export function DashboardPage({
         </Card>
       </section>
 
-      <section className="order-2">
+      <section className={`order-2 grid gap-4 sm:gap-5 ${overallRankingVisible ? "xl:grid-cols-2" : ""}`}>
         <Card>
           <div className="mb-4">
             <p className="text-sm font-bold text-accent-strong">{t("weeklyEyebrow", { count: countThisWeek(userLogs) })}</p>
@@ -213,6 +215,16 @@ export function DashboardPage({
             {t("shareAction")}
           </button>
         </Card>
+
+        {overallRankingVisible ? (
+          <Card>
+            <div className="mb-4">
+              <p className="text-sm font-bold text-accent-strong">{t("overallEyebrow")}</p>
+              <h2 className="text-2xl font-black text-fg">{t("overallTitle")}</h2>
+            </div>
+            <RankingList users={rankedUsers} currentUid={user.uid} />
+          </Card>
+        ) : null}
       </section>
     </div>
   );

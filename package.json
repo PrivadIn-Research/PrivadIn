@@ -1,10 +1,11 @@
 {
   "name": "privadin",
   "private": true,
-  "version": "1.0.26",
+  "version": "1.0.28",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm version patch --no-git-tag-version",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

@@ -414,6 +414,7 @@ export async function resetWeeklyRanking(admin: AppUser, logs: PoopLog[], users:
     appSettingsDocRef,
     {
       edition: nextEdition,
+      overallRankingVisible: true,
       updatedAt: Timestamp.now(),
       updatedBy: admin.uid,
     },

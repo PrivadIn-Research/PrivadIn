@@ -43,6 +43,7 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
   const { t } = useTranslation("profile");
   const { refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const avatarFileInputId = `avatar-file-${user.uid}`;
   const [name, setName] = useState(user.name);
   const [nickname, setNickname] = useState(user.nickname ?? "");
   const [manualAvatarUrl, setManualAvatarUrl] = useState(
@@ -101,14 +102,14 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
     setAvatarStatus(isValidDicebearUrl(user.avatar ?? "") ? "valid" : "idle");
     setAvatarAction("keep");
     setPendingAvatarFile(null);
-    if (cropperImageUrl) {
-      URL.revokeObjectURL(cropperImageUrl);
-      setCropperImageUrl(null);
-    }
-    if (uploadedAvatarPreviewUrl) {
-      URL.revokeObjectURL(uploadedAvatarPreviewUrl);
-      setUploadedAvatarPreviewUrl(null);
-    }
+    setCropperImageUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    setUploadedAvatarPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
     setWorkSchedule({
       horarioInicioExpediente: user.workSchedule?.horarioInicioExpediente ?? "09:00",
       horarioFimExpediente: user.workSchedule?.horarioFimExpediente ?? "18:00",
@@ -121,7 +122,7 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [cropperImageUrl, uploadedAvatarPreviewUrl, user.avatar, user.email, user.name, user.nickname, user.uid, user.workSchedule, user.bathroomDurationMinutes]);
+  }, [user.avatar, user.email, user.name, user.nickname, user.uid, user.workSchedule, user.bathroomDurationMinutes]);
 
   useEffect(() => {
     void refreshSalarySummary();
@@ -524,13 +525,12 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="rounded-2xl bg-accent px-4 py-3 text-sm font-black text-accent-fg transition hover:bg-accent-strong"
+                  <label
+                    htmlFor={avatarFileInputId}
+                    className="cursor-pointer rounded-2xl bg-accent px-4 py-3 text-sm font-black text-accent-fg transition hover:bg-accent-strong"
                   >
                     {user.avatarStoragePath || pendingAvatarFile ? t("avatarUploadReplaceAction") : t("avatarUploadAction")}
-                  </button>
+                  </label>
                   <button
                     type="button"
                     onClick={handleUseDefaultAvatar}
@@ -541,10 +541,11 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
                 </div>
 
                 <input
+                  id={avatarFileInputId}
                   ref={fileInputRef}
                   type="file"
                   accept={AVATAR_ACCEPTED_TYPES.join(",")}
-                  className="hidden"
+                  className="sr-only"
                   onChange={(event) => void handleAvatarFileChange(event)}
                 />
 

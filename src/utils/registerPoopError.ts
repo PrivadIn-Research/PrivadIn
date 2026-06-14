@@ -11,7 +11,7 @@ export type RegisterPoopErrorCode =
   | "location_unavailable"
   | "location_invalid";
 
-export type RegisterPoopResolutionTarget = "none" | "profile";
+export type RegisterPoopResolutionTarget = "none" | "profile" | "terms";
 
 export class RegisterPoopError extends Error {
   readonly code: RegisterPoopErrorCode;

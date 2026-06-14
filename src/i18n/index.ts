@@ -22,6 +22,7 @@ i18n.addResources("pt-BR", "dashboard", {
     weeklyPointsHint: "So voce ve sua pontuacao acumulada durante a semana",
   },
   resolveProfileAction: "Resolver no perfil",
+  resolveTermsAction: "Revisar termos",
 });
 
 i18n.addResources("pt-BR", "profile", {
@@ -106,6 +107,7 @@ i18n.addResources("en-US", "dashboard", {
     weeklyPointsHint: "Only your running score stays visible during the week",
   },
   resolveProfileAction: "Open profile",
+  resolveTermsAction: "Review terms",
 });
 
 i18n.addResources("en-US", "profile", {

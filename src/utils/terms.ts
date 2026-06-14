@@ -2,6 +2,7 @@ import type { AppSettings, AppUser } from "../types";
 
 export const INITIAL_TERMS_OF_USE_VERSION = 1;
 export const MAX_TERMS_OF_USE_LENGTH = 5000;
+export const TERMS_ENFORCEMENT_ENABLED = false;
 
 export const DEFAULT_TERMS_OF_USE_TEXT = [
   "Ao usar o PrivadIn, voce concorda com a coleta e o armazenamento dos dados necessarios para operar a competicao.",
@@ -26,6 +27,10 @@ export function hasAcceptedCurrentTerms(
   user: Pick<AppUser, "termsAccepted" | "acceptedTermsVersion"> | null | undefined,
   settings: Pick<AppSettings, "termsOfUseVersion">,
 ) {
+  if (!TERMS_ENFORCEMENT_ENABLED) {
+    return true;
+  }
+
   if (!user) return false;
 
   const currentVersion = getCurrentTermsVersion(settings);

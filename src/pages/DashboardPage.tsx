@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, MetricCard } from "../components/Card";
 import { RankingList } from "../components/RankingList";
+import { useAuth } from "../contexts/AuthContext";
 import type { AppUser, PoopLog, RankedUser } from "../types";
 import { countThisWeek, formatDateTime, formatHour, getCooldownSeconds, getLastLog } from "../utils/date";
 import { formatNumber } from "../utils/format";
@@ -38,6 +39,7 @@ export function DashboardPage({
   onOpenProfile: () => void;
 }) {
   const { t } = useTranslation(["dashboard", "common"]);
+  const { openTermsReview } = useAuth();
   const currentRank = rankedUsers.find((ranked) => ranked.uid === user.uid);
   const lastLog = getLastLog(userLogs);
   const logCooldownSeconds = getCooldownSeconds(userLogs, cooldownMinutes);
@@ -70,7 +72,7 @@ export function DashboardPage({
         confetti({ particleCount: 140, spread: 75, origin: { y: 0.72 }, colors: ["#fde047", "#f59e0b", "#14b8a6"] });
       }
     } catch (error) {
-      if (isRegisterPoopError(error) && error.resolutionTarget === "profile") {
+      if (isRegisterPoopError(error) && (error.resolutionTarget === "profile" || error.resolutionTarget === "terms")) {
         toast((toastInstance) => (
           <div className="space-y-3">
             <p className="text-sm font-semibold text-fg">{error.message}</p>
@@ -79,10 +81,14 @@ export function DashboardPage({
               className="rounded-xl bg-accent px-3 py-2 text-sm font-black text-accent-fg transition hover:bg-accent-strong"
               onClick={() => {
                 toast.dismiss(toastInstance.id);
+                if (error.resolutionTarget === "terms") {
+                  void openTermsReview();
+                  return;
+                }
                 onOpenProfile();
               }}
             >
-              {t("resolveProfileAction")}
+              {error.resolutionTarget === "terms" ? t("resolveTermsAction") : t("resolveProfileAction")}
             </button>
           </div>
         ));

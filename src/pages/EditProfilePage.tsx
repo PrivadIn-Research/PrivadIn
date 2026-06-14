@@ -57,8 +57,6 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
   const [cropperImageUrl, setCropperImageUrl] = useState<string | null>(null);
   const [uploadedAvatarPreviewUrl, setUploadedAvatarPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [operationalBusy, setOperationalBusy] = useState(false);
-  const [salaryBusy, setSalaryBusy] = useState(false);
   const [updateCheckStatus, setUpdateCheckStatus] = useState<UpdateCheckStatus>("idle");
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [workSchedule, setWorkSchedule] = useState<WorkSchedule>({
@@ -75,6 +73,10 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
 
   const nameError = validateProfileIdentity(name, { required: true, maxLength: NAME_MAX_LENGTH });
   const nicknameError = validateProfileIdentity(nickname, { maxLength: NICKNAME_MAX_LENGTH });
+  const parsedSalaryCents = parseCurrencyInputToCents(monthlySalary);
+  const salaryError = !Number.isFinite(parsedSalaryCents) || parsedSalaryCents < 0;
+  const bathroomDurationError = !Number.isInteger(bathroomDurationMinutes) || bathroomDurationMinutes < 1 || bathroomDurationMinutes > 180;
+
   const currentVersion = getCurrentVersion();
   const generatedDefaultAvatar = useMemo(() => {
     const normalizedName = normalizeProfileIdentity(name);
@@ -92,6 +94,8 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
     busy ||
     Boolean(nameError) ||
     Boolean(nicknameError) ||
+    salaryError ||
+    bathroomDurationError ||
     (avatarAction === "manual" && !hasValidManualAvatar) ||
     (avatarAction === "upload" && !pendingAvatarFile);
 
@@ -236,7 +240,7 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
     }
   }
 
-  async function handleSubmit(event: FormEvent) {
+  async function handleSaveAll(event: FormEvent) {
     event.preventDefault();
     if (nameError) {
       toast.error(
@@ -255,6 +259,17 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
           ? t("nicknameTooLong", { count: NICKNAME_MAX_LENGTH })
           : t("identityInvalid"),
       );
+      return;
+    }
+
+    const monthlySalaryCents = parseCurrencyInputToCents(monthlySalary);
+    if (!Number.isFinite(monthlySalaryCents) || monthlySalaryCents < 0) {
+      toast.error(t("salaryInvalid"));
+      return;
+    }
+
+    if (bathroomDurationError) {
+      toast.error(t("bathroomDurationInvalid") || "Duração do banho inválida (1-180 minutos).");
       return;
     }
 
@@ -307,7 +322,16 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
         }
       }
 
+      await updateUserOperationalProfile(user.uid, {
+        workSchedule,
+        bathroomDurationMinutes,
+      });
+
+      saveLocalMonthlySalaryCents(user.uid, monthlySalaryCents);
+
       await refreshProfile();
+      await refreshSalarySummary(bathroomDurationMinutes, workSchedule);
+
       clearPendingUpload();
       replaceCropperImageUrl(null);
       setAvatarAction("keep");
@@ -329,9 +353,14 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
     }
   }
 
-  async function refreshSalarySummary() {
+  async function refreshSalarySummary(
+    customBathroomDurationMinutes?: number,
+    customWorkSchedule?: WorkSchedule
+  ) {
     try {
-      const durationFallback = Math.max(1, Math.min(180, Number(user.bathroomDurationMinutes ?? 10)));
+      const duration = customBathroomDurationMinutes ?? bathroomDurationMinutes;
+      const sched = customWorkSchedule ?? workSchedule;
+      const durationFallback = Math.max(1, Math.min(180, Number(duration)));
       const [logsSnapshot, resetAuditSnapshot] = await Promise.all([
         getDocs(query(collection(db, "poop_logs"), where("userId", "==", user.uid))),
         getDocs(competitionResetAuditLogsQuery()),
@@ -339,7 +368,7 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
       const logs = logsSnapshot.docs.map((logDoc) => ({ id: logDoc.id, ...logDoc.data() }) as PoopLog);
       const resetAuditLogs = resetAuditSnapshot.docs.map((auditDoc) => ({ id: auditDoc.id, ...auditDoc.data() }) as AdminAuditLog);
       const monthlySalaryCents = getLocalMonthlySalaryCents(user.uid);
-      const monthlyWorkMinutes = dailyWorkMinutes(resolveWorkSchedule(user.workSchedule)) * 22;
+      const monthlyWorkMinutes = dailyWorkMinutes(resolveWorkSchedule(sched)) * 22;
 
       setSalarySummary(
         buildSalarySummaryFromLogs(
@@ -353,46 +382,6 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
       );
     } catch (error) {
       console.error(error);
-    }
-  }
-
-  async function handleOperationalSubmit(event: FormEvent) {
-    event.preventDefault();
-    setOperationalBusy(true);
-    try {
-      await updateUserOperationalProfile(user.uid, {
-        workSchedule,
-        bathroomDurationMinutes,
-      });
-      await refreshProfile();
-      toast.success(t("operationalSaved"));
-    } catch (error) {
-      console.error(error);
-      toast.error(t("operationalSaveError"));
-    } finally {
-      setOperationalBusy(false);
-    }
-  }
-
-  async function handleSalarySubmit(event: FormEvent) {
-    event.preventDefault();
-    const monthlySalaryCents = parseCurrencyInputToCents(monthlySalary);
-    if (!Number.isFinite(monthlySalaryCents) || monthlySalaryCents < 0) {
-      toast.error(t("salaryInvalid"));
-      return;
-    }
-
-    setSalaryBusy(true);
-    try {
-      saveLocalMonthlySalaryCents(user.uid, monthlySalaryCents);
-      await refreshSalarySummary();
-      setMonthlySalary(formatCurrencyFromCents(monthlySalaryCents));
-      toast.success(t("salarySaved"));
-    } catch (error) {
-      console.error(error);
-      toast.error(t("salarySaveError"));
-    } finally {
-      setSalaryBusy(false);
     }
   }
 
@@ -441,7 +430,7 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
   }
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <form onSubmit={handleSaveAll} className="space-y-4 sm:space-y-5">
       <Card>
         <div className="mb-4">
           <p className="text-sm font-bold text-accent-strong">{t("eyebrow")}</p>
@@ -449,7 +438,7 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
           <p className="mt-1 text-sm text-fg-muted">{t("description")}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-5">
+        <div className="grid gap-5">
           <label>
             <span className="mb-2 block text-sm font-bold text-fg-soft">{t("name")}</span>
             <input
@@ -625,31 +614,7 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
               </div>
             </div>
           </div>
-
-          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-            <div className="w-full flex-1">
-              <p className="font-black text-fg">{t("avatarSaveTitle")}</p>
-              <p className="text-sm text-fg-muted">{t("avatarSaveHint")}</p>
-            </div>
-            <div className="flex w-full gap-3 sm:w-auto">
-              {setView ? (
-                <button
-                  type="button"
-                  onClick={() => setView("profile")}
-                  className="w-full rounded-2xl border border-line/10 bg-panel px-5 py-3 font-black text-fg hover:bg-panel-strong sm:w-auto"
-                >
-                  {t("common:actions.cancel")}
-                </button>
-              ) : null}
-              <button
-                disabled={isSaveDisabled}
-                className="w-full rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60 sm:w-auto"
-              >
-                {busy ? t("avatarSaving") : t("save")}
-              </button>
-            </div>
-          </div>
-        </form>
+        </div>
       </Card>
 
       <Card>
@@ -659,7 +624,7 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
           <p className="mt-1 text-sm text-fg-muted">{t("operationalSectionDescription")}</p>
         </div>
 
-        <form onSubmit={handleOperationalSubmit} className="grid gap-4">
+        <div className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
               <span className="mb-2 block text-sm font-bold text-fg-soft">{t("workdayStart")}</span>
@@ -730,16 +695,14 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
                 onChange={(event) => setBathroomDurationMinutes(Number(event.target.value))}
                 required
               />
+              {bathroomDurationError && (
+                <p className="mt-2 text-xs font-semibold text-danger">
+                  Duração do banho deve ser entre 1 e 180 minutos.
+                </p>
+              )}
             </label>
           </div>
-
-          <button
-            disabled={operationalBusy}
-            className="w-full rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60 sm:w-auto"
-          >
-            {operationalBusy ? t("operationalSaving") : t("operationalSave")}
-          </button>
-        </form>
+        </div>
       </Card>
 
       <Card>
@@ -749,7 +712,7 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
           <p className="mt-1 text-sm text-fg-muted">{t("salarySectionDescription")}</p>
         </div>
 
-        <form onSubmit={handleSalarySubmit} className="grid gap-4 sm:grid-cols-[1fr_auto]">
+        <div className="grid gap-4">
           <label>
             <span className="mb-2 block text-sm font-bold text-fg-soft">{t("salaryInputLabel")}</span>
             <input
@@ -759,14 +722,13 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
               onChange={(event) => setMonthlySalary(formatCurrencyInput(event.target.value))}
               placeholder={t("salaryPlaceholder")}
             />
+            {salaryError && (
+              <p className="mt-2 text-xs font-semibold text-danger">
+                {t("salaryInvalid")}
+              </p>
+            )}
           </label>
-          <button
-            disabled={salaryBusy}
-            className="self-end rounded-2xl bg-panel-strong px-5 py-3 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
-          >
-            {salaryBusy ? t("operationalSaving") : t("salarySave")}
-          </button>
-        </form>
+        </div>
 
         {salarySummary ? (
           <div className="mt-4 space-y-4">
@@ -817,6 +779,31 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
         ) : null}
       </Card>
 
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center justify-between rounded-3xl border border-line/10 bg-panel p-4 sm:p-5">
+        <div className="w-full flex-1">
+          <p className="font-black text-fg">{t("avatarSaveTitle")}</p>
+          <p className="text-sm text-fg-muted">{t("avatarSaveHint")}</p>
+        </div>
+        <div className="flex w-full gap-3 sm:w-auto">
+          {setView ? (
+            <button
+              type="button"
+              onClick={() => setView("profile")}
+              className="w-full rounded-2xl border border-line/10 bg-panel px-5 py-3 font-black text-fg hover:bg-panel-strong sm:w-auto"
+            >
+              {t("common:actions.cancel")}
+            </button>
+          ) : null}
+          <button
+            type="submit"
+            disabled={isSaveDisabled}
+            className="w-full rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60 sm:w-auto"
+          >
+            {busy ? t("avatarSaving") : t("save")}
+          </button>
+        </div>
+      </div>
+
       <Card>
         <div className="space-y-3">
           <div>
@@ -828,6 +815,7 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
+              type="button"
               onClick={() => void handleCheckUpdates()}
               disabled={updateCheckStatus === "checking" || updateCheckStatus === "applying" || busy}
               className="w-full rounded-2xl bg-panel-strong px-5 py-3 font-black text-fg hover:bg-panel-subtle disabled:opacity-60 sm:w-auto"
@@ -844,6 +832,7 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
 
             {latestVersion && (updateCheckStatus === "available" || updateCheckStatus === "applying") ? (
               <button
+                type="button"
                 onClick={() => void handleApplyUpdate()}
                 disabled={updateCheckStatus === "applying" || busy}
                 className="w-full rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60 sm:w-auto"
@@ -893,6 +882,6 @@ export function EditProfilePage({ user, appSettings, setView }: { user: AppUser;
           )}
         </div>
       </Card>
-    </div>
+    </form>
   );
 }

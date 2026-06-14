@@ -9,10 +9,12 @@ export function RankingList({
   users,
   mode = "overall",
   currentUid,
+  onViewProfile,
 }: {
   users: RankedUser[];
   mode?: "overall" | "weekly";
   currentUid?: string;
+  onViewProfile?: (uid: string) => void;
 }) {
   const { t } = useTranslation("common");
   const sorted = [...users].sort((a, b) => (mode === "weekly" ? a.weeklyRank - b.weeklyRank : a.rank - b.rank));
@@ -39,7 +41,17 @@ export function RankingList({
             <AvatarImage avatar={user.avatar} email={user.email} name={user.name} className="h-10 w-10 sm:h-11 sm:w-11" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-sm font-black text-fg sm:text-base">{user.name}</p>
+                {onViewProfile ? (
+                  <button
+                    type="button"
+                    onClick={() => onViewProfile(user.uid)}
+                    className="truncate text-left text-sm font-black text-fg hover:text-accent-strong hover:underline sm:text-base outline-none"
+                  >
+                    {user.name}
+                  </button>
+                ) : (
+                  <p className="truncate text-sm font-black text-fg sm:text-base">{user.name}</p>
+                )}
                 <span className="rounded-full bg-panel px-2 py-0.5 text-[10px] font-semibold text-accent-strong sm:text-xs">
                   #{rank}
                 </span>

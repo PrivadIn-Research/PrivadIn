@@ -110,6 +110,7 @@ function AppContent() {
           overallRankingVisible={appSettings.overallRankingVisible === true}
           onPlaySound={playFlush}
           onOpenProfile={() => handleViewProfile(liveUser.uid)}
+          onViewProfile={handleViewProfile}
         />
       ) : null}
       {view === "profile" && profileUser ? (

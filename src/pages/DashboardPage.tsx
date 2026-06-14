@@ -26,6 +26,7 @@ export function DashboardPage({
   overallRankingVisible,
   onPlaySound,
   onOpenProfile,
+  onViewProfile,
 }: {
   user: AppUser;
   rankedUsers: RankedUser[];
@@ -37,6 +38,7 @@ export function DashboardPage({
   overallRankingVisible: boolean;
   onPlaySound: () => void;
   onOpenProfile: () => void;
+  onViewProfile: (uid: string) => void;
 }) {
   const { t } = useTranslation(["dashboard", "common"]);
   const { openTermsReview } = useAuth();
@@ -208,11 +210,11 @@ export function DashboardPage({
             <p className="text-sm font-bold text-accent-strong">{t("weeklyEyebrow", { count: countThisWeek(userLogs) })}</p>
             <h2 className="text-2xl font-black text-fg">{t("weeklyTitle")}</h2>
           </div>
-          <RankingList users={rankedUsers} mode="weekly" currentUid={user.uid} />
+          <RankingList users={rankedUsers} mode="weekly" currentUid={user.uid} onViewProfile={onViewProfile} />
           <button
             onClick={handleShareRanking}
             disabled={isSharingRanking}
-            className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-accent-soft/35 px-4 py-3 text-sm font-black text-accent-strong transition sm:w-auto ${
+            className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/20 bg-accent-soft/35 px-4 py-3 text-sm font-black text-accent-strong transition sm:w-auto ${
               isSharingRanking ? "cursor-wait opacity-70" : "hover:bg-accent hover:text-accent-fg"
             }`}
             title={t("shareTitle")}
@@ -228,7 +230,7 @@ export function DashboardPage({
               <p className="text-sm font-bold text-accent-strong">{t("overallEyebrow")}</p>
               <h2 className="text-2xl font-black text-fg">{t("overallTitle")}</h2>
             </div>
-            <RankingList users={rankedUsers} currentUid={user.uid} />
+            <RankingList users={rankedUsers} currentUid={user.uid} onViewProfile={onViewProfile} />
           </Card>
         ) : null}
       </section>

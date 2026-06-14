@@ -2,6 +2,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ----------------------------------------
+    // FUNÇÕES DE AUTENTICAÇÃO E SEGURANÇA
+    // ----------------------------------------
     function signedIn() {
       return request.auth != null;
     }
@@ -10,186 +14,92 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    function userProtectedFields() {
-      return [
-        "uid",
-        "email",
-        "role",
-        "totalPoints",
-        "weeklyPoints",
-        "currentDailyStreak",
-        "currentWeeklyStreak",
-        "bestStreak",
-        "createdAt",
-        "firstLogAt",
-        "lastLogAt",
-        "cooldownUntil",
-        "isActive",
-        "deactivatedAt",
-        "deactivatedBy"
-      ];
-    }
-
-    function ownerKeepsProtectedUserFields() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(userProtectedFields());
-    }
-
-    function isValidOptionalString(value, maxLen) {
-      return value == null || (value is string && value.size() <= maxLen);
-    }
-
-    function isValidWorkSchedule(value) {
-      return value is map
-        && value.horarioInicioExpediente is string
-        && value.horarioInicioExpediente.size() == 5
-        && value.horarioFimExpediente is string
-        && value.horarioFimExpediente.size() == 5
-        && value.horarioInicioAlmoco is string
-        && value.horarioInicioAlmoco.size() == 5
-        && value.horarioFimAlmoco is string
-        && value.horarioFimAlmoco.size() == 5
-        && value.timezone is string
-        && value.timezone.size() > 0
-        && value.timezone.size() <= 64;
-    }
-
-    function isValidUserProfileDocument() {
-      return request.resource.data.uid is string
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() <= 35
-        && isValidOptionalString(request.resource.data.nickname, 35)
-        && request.resource.data.email is string
-        && request.resource.data.email.size() > 3
-        && request.resource.data.email.size() <= 160
-        && request.resource.data.avatar is string
-        && request.resource.data.avatar.size() > 0
-        && request.resource.data.avatar.size() <= 1000
-        && isValidOptionalString(request.resource.data.avatarStoragePath, 300)
-        && request.resource.data.role in ["player", "admin"]
-        && request.resource.data.totalPoints is int
-        && request.resource.data.weeklyPoints is int
-        && request.resource.data.currentDailyStreak is int
-        && request.resource.data.currentWeeklyStreak is int
-        && request.resource.data.bestStreak is int
-        && request.resource.data.createdAt is timestamp
-        && (!("firstLogAt" in request.resource.data) || request.resource.data.firstLogAt == null || request.resource.data.firstLogAt is timestamp)
-        && (!("lastLogAt" in request.resource.data) || request.resource.data.lastLogAt == null || request.resource.data.lastLogAt is timestamp)
-        && (!("cooldownUntil" in request.resource.data) || request.resource.data.cooldownUntil == null || request.resource.data.cooldownUntil is timestamp)
-        && (!("workSchedule" in request.resource.data) || request.resource.data.workSchedule == null || isValidWorkSchedule(request.resource.data.workSchedule))
-        && (!("termsAccepted" in request.resource.data) || request.resource.data.termsAccepted is bool)
-        && (!("acceptedAt" in request.resource.data) || request.resource.data.acceptedAt == null || request.resource.data.acceptedAt is timestamp)
-        && (!("bathroomDurationMinutes" in request.resource.data) || (request.resource.data.bathroomDurationMinutes is int
-          && request.resource.data.bathroomDurationMinutes >= 1
-          && request.resource.data.bathroomDurationMinutes <= 180))
-        && (!("isActive" in request.resource.data) || request.resource.data.isActive is bool)
-        && (!("deactivatedAt" in request.resource.data) || request.resource.data.deactivatedAt == null || request.resource.data.deactivatedAt is timestamp)
-        && (!("deactivatedBy" in request.resource.data) || request.resource.data.deactivatedBy == null || (request.resource.data.deactivatedBy is string && request.resource.data.deactivatedBy.size() <= 128));
-    }
-
     function isAdmin() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
     }
 
-    function hasCuiterAccess() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastLogAt is timestamp;
+    function isPlayerRoleOnCreate() {
+      return request.resource.data.role == "player";
     }
 
-    function cuiterStartDate() {
-      return timestamp.date(2026, 5, 27);
+    // Campos que o usuário comum NUNCA pode alterar por conta própria (anti-cheat)
+    function userProtectedFields() {
+      return [
+        "uid", "email", "role", "totalPoints", "weeklyPoints",
+        "currentDailyStreak", "currentWeeklyStreak", "bestStreak",
+        "createdAt", "firstLogAt", "lastLogAt", "cooldownUntil",
+        "isActive", "deactivatedAt", "deactivatedBy"
+      ];
     }
 
+    // Garante que o update não está tentando modificar os campos protegidos acima
+    function ownerKeepsProtectedUserFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(userProtectedFields());
+    }
+
+
+    // ----------------------------------------
+    // REGRAS POR COLEÇÃO
+    // ----------------------------------------
+
+    // PERFIS DE USUÁRIO
     match /users/{userId} {
       allow read: if signedIn();
-      allow create: if isOwner(userId)
-        && isValidUserProfileDocument()
-        && request.resource.data.role == "player"
-        && (request.resource.data.isActive == null || request.resource.data.isActive == true)
-        && request.resource.data.deactivatedAt == null
-        && request.resource.data.deactivatedBy == null;
-      allow update: if (isAdmin() && isValidUserProfileDocument())
-        || (isOwner(userId) && isValidUserProfileDocument() && ownerKeepsProtectedUserFields());
+      // Permite criar se for o dono
+      allow create: if isOwner(userId) && isPlayerRoleOnCreate();
+      // Admin edita tudo. Dono edita o que quiser, desde que não trapaceie os pontos/status
+      allow update: if isAdmin() || (isOwner(userId) && ownerKeepsProtectedUserFields());
       allow delete: if false;
     }
 
-    function validPoopLogCreate() {
-      return request.resource.data.userName is string
-        && request.resource.data.userName.size() > 0
-        && request.resource.data.userName.size() <= 80
-        && request.resource.data.points is int
-        && request.resource.data.points >= 1
-        && request.resource.data.points <= 100000
-        && request.resource.data.createdAt is timestamp
-        && request.resource.data.isWeeklyActive is bool
-        && request.resource.data.userId is string;
-    }
-
-    function validPlayerPoopLogCreate() {
-      return validPoopLogCreate()
-        && isOwner(request.resource.data.userId)
-        && request.resource.data.location.latitude is number
-        && request.resource.data.location.longitude is number
-        && request.resource.data.timezone is string
-        && request.resource.data.localTime is string
-        && request.resource.data.durationMinutes is int
-        && request.resource.data.durationMinutes >= 1
-        && request.resource.data.durationMinutes <= 180;
-    }
-
+    // LOGS DO JOGO/BANHEIRO
     match /poop_logs/{logId} {
       allow read: if signedIn();
-      allow create: if validPlayerPoopLogCreate() || (isAdmin() && validPoopLogCreate());
+      // O usuário logado só pode criar logs para ele mesmo
+      allow create: if (signedIn() && request.resource.data.userId == request.auth.uid) || isAdmin();
       allow update, delete: if isAdmin();
     }
 
+    // DADOS PRIVADOS DO USUÁRIO
     match /user_private/{userId} {
       allow read, write: if isOwner(userId);
     }
 
+    // LOGS DE AUDITORIA (ADMIN)
     match /admin_audit_logs/{auditLogId} {
-      allow read, create: if isAdmin();
+      allow create: if isAdmin();
+      allow read: if isAdmin() || (signedIn() && resource.data.action == "reset_weekly");
       allow update, delete: if false;
     }
 
+    // CONFIGURAÇÕES DO APP
     match /app_settings/{settingId} {
       allow read: if true;
       allow create, update: if isAdmin();
       allow delete: if false;
     }
 
+    // REQUISIÇÕES DE CADASTRO
     match /registration_requests/{requestId} {
       allow get, create: if true;
       allow list: if isAdmin();
-      allow update: if signedIn()
-        && resource.data.status == "pending"
-        && request.resource.data.status == "used"
-        && request.resource.data.claimedBy == request.auth.uid;
+      allow update: if signedIn() && resource.data.status == "pending" && request.resource.data.status == "used";
       allow delete: if false;
     }
 
+    // TENTATIVAS DE CADASTRO
     match /registration_attempts/{attemptId} {
       allow create: if true;
       allow read: if isAdmin();
       allow update, delete: if false;
     }
 
+    // POSTS DO CUITER
     match /cuiter_posts/{postId} {
       allow read: if signedIn();
-      allow create: if hasCuiterAccess()
-        && request.time >= cuiterStartDate()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.createdAt is timestamp
-        && request.resource.data.userName is string
-        && request.resource.data.userName.size() > 0
-        && request.resource.data.userName.size() <= 80
-        && request.resource.data.message is string
-        && request.resource.data.message.size() > 0
-        && request.resource.data.message.size() <= 80;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if false;
     }
   }

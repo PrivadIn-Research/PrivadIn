@@ -1,13 +1,14 @@
 {
   "name": "privadin",
   "private": true,
-  "version": "1.0.28",
+  "version": "1.0.31",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "prebuild": "npm version patch --no-git-tag-version",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "tsc && vite build && firebase deploy"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",

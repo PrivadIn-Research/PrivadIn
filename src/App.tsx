@@ -25,7 +25,7 @@ import type { AppView } from "./types";
 
 function AppContent() {
   const { t } = useTranslation("common");
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, currentAppSettings } = useAuth();
   const { appSettings } = useAppSettings();
   const { users, rankedUsers } = useUsers(Boolean(user));
   const [view, setView] = useState<AppView>("dashboard");
@@ -63,7 +63,14 @@ function AppContent() {
     );
   }
 
-  if (!liveUser) return <LoginPage cooldownMinutes={appSettings.cooldownMinutes} />;
+  if (!liveUser) {
+    return (
+      <LoginPage
+        cooldownMinutes={appSettings.cooldownMinutes}
+        appSettings={currentAppSettings ?? appSettings}
+      />
+    );
+  }
 
   return (
     <Shell currentUser={liveUser} view={view} onViewChange={setView} muted={muted} onToggleMuted={toggleMuted}>
@@ -81,7 +88,7 @@ function AppContent() {
           onOpenProfile={() => setView("profile")}
         />
       ) : null}
-      {view === "profile" ? <EditProfilePage user={liveUser} /> : null}
+      {view === "profile" ? <EditProfilePage user={liveUser} appSettings={appSettings} /> : null}
       {view === "history" ? <HistoryPage logs={userLogs} /> : null}
       {view === "stats" ? <StatsPage user={liveUser} logs={userLogs} allLogs={allLogs} rankedUsers={rankedUsers} overallRankingVisible={appSettings.overallRankingVisible === true} /> : null}
       {view === "cuiter" ? <CuiterPage user={liveUser} userLogs={userLogs} users={users} /> : null}

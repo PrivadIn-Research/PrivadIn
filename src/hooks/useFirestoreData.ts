@@ -37,29 +37,47 @@ function sortLogs(logs: PoopLog[]) {
 
 export function useUsers(enabled = true) {
   const [users, setUsers] = useState<AppUser[]>([]);
+  const [logs, setLogs] = useState<PoopLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!enabled || !isFirebaseConfigured) {
       setUsers([]);
+      setLogs([]);
       setLoading(false);
       return;
     }
 
-    return onSnapshot(
+    const unsubscribeUsers = onSnapshot(
       usersQuery(),
       (snapshot) => {
         setUsers(snapshot.docs.map((doc) => doc.data() as AppUser));
         setLoading(false);
       },
       (error) => {
-        console.error("Erro ao ler ranking de usuários:", error);
+        console.error("Erro ao ler ranking de usuarios:", error);
         setLoading(false);
       },
     );
+
+    const unsubscribeLogs = onSnapshot(
+      allLogsQuery(),
+      (snapshot) => {
+        const nextLogs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as PoopLog);
+        setLogs(sortLogs(nextLogs));
+      },
+      (error) => {
+        console.error("Erro ao ler logs para desempate do ranking:", error);
+      },
+    );
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribeLogs();
+    };
   }, [enabled]);
 
-  const rankedUsers = useMemo<RankedUser[]>(() => rankUsers(users), [users]);
+  const rankedUsers = useMemo<RankedUser[]>(() => rankUsers(users, logs), [logs, users]);
   return { users, rankedUsers, loading };
 }
 
@@ -82,7 +100,7 @@ export function useUserLogs(uid?: string, enabled = true) {
         setLoading(false);
       },
       (error) => {
-        console.error("Erro ao ler histórico do usuário:", error);
+        console.error("Erro ao ler historico do usuario:", error);
         setLoading(false);
       },
     );
@@ -157,7 +175,7 @@ export function useRegistrationRequests(enabled = true) {
         );
       },
       (error) => {
-        console.error("Erro ao ler solicitações de cadastro:", error);
+        console.error("Erro ao ler solicitacoes de cadastro:", error);
       },
     );
   }, [enabled]);
@@ -208,7 +226,7 @@ export function useAppSettings(enabled = true) {
         setLoading(false);
       },
       (error) => {
-        console.error("Erro ao ler configurações do app:", error);
+        console.error("Erro ao ler configuracoes do app:", error);
         setAppSettings(defaultAppSettings);
         setLoading(false);
       },

@@ -110,7 +110,6 @@ export async function updateUserOperationalProfile(
   firebaseUid: string,
   updates: {
     workSchedule?: AppUser["workSchedule"];
-    termsAccepted?: boolean;
     bathroomDurationMinutes?: number;
   },
 ) {
@@ -125,12 +124,18 @@ export async function updateUserOperationalProfile(
     payload.bathroomDurationMinutes = Math.max(1, Math.min(180, Math.trunc(updates.bathroomDurationMinutes)));
   }
 
-  if (updates.termsAccepted === true) {
-    payload.termsAccepted = true;
-    payload.acceptedAt = Timestamp.now();
-  }
-
   await updateDoc(userDoc, payload);
+  const snapshot = await getDoc(userDoc);
+  return snapshot.data() as AppUser;
+}
+
+export async function acceptTermsOfUse(firebaseUid: string, termsVersion: number) {
+  const userDoc = doc(db, "users", firebaseUid);
+  await updateDoc(userDoc, {
+    termsAccepted: true,
+    acceptedAt: Timestamp.now(),
+    acceptedTermsVersion: Math.max(1, Math.trunc(termsVersion)),
+  });
   const snapshot = await getDoc(userDoc);
   return snapshot.data() as AppUser;
 }

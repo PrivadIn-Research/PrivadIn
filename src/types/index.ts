@@ -40,6 +40,7 @@ export interface AppUser {
   workSchedule?: WorkSchedule;
   termsAccepted?: boolean;
   acceptedAt?: Timestamp;
+  acceptedTermsVersion?: number;
   cooldownUntil?: Timestamp;
   bathroomDurationMinutes?: number;
   isActive?: boolean;
@@ -58,6 +59,7 @@ export interface PoopLog {
   timezone?: string;
   localTime?: string;
   durationMinutes?: number;
+  competitionEdition?: number;
 }
 
 export interface CuiterPost {
@@ -73,6 +75,10 @@ export interface AppSettings {
   pointsPerLog: number;
   edition: number;
   overallRankingVisible?: boolean;
+  termsOfUseText?: string;
+  termsOfUseVersion?: number;
+  termsOfUseUpdatedAt?: Timestamp;
+  termsOfUseUpdatedBy?: string;
   competitionAnnouncement?: string;
   competitionAnnouncementUpdatedAt?: Timestamp;
   competitionAnnouncementUpdatedBy?: string;
@@ -97,6 +103,7 @@ export type AdminAuditAction =
   | "reset_weekly"
   | "update_cooldown"
   | "update_points_per_log"
+  | "update_terms_of_use"
   | "deactivate_user"
   | "reactivate_user"
   | "update_competition_announcement";
@@ -178,7 +185,14 @@ export interface StatSummary {
 
 export interface SalarySummary {
   monthlySalaryCents: number;
-  estimatedEarnedCents: number;
+  currentCompetitionEarnedCents: number;
+  totalEarnedCents: number;
   hourlyRateCents: number;
   totalBathroomMinutes: number;
+  competitionHistory: {
+    edition: number;
+    earnedCents: number;
+    totalBathroomMinutes: number;
+    logsCount: number;
+  }[];
 }

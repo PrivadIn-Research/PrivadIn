@@ -7,15 +7,19 @@ import { AvatarImage } from "../components/AvatarImage";
 import { Card } from "../components/Card";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../services/firebase";
+import { competitionResetAuditLogsQuery } from "../services/poopService";
 import { deleteAvatarFile, updateUserOperationalProfile, updateUserProfile, uploadAvatarFile } from "../services/userService";
 import { checkForUpdates, getCurrentVersion, triggerPWAUpdate } from "../services/updateService";
-import type { AppUser, SalarySummary, WorkSchedule } from "../types";
+import type { AdminAuditLog, AppSettings, AppUser, PoopLog, SalarySummary, WorkSchedule } from "../types";
 import {
   AVATAR_ACCEPTED_TYPES,
   validateAvatarFile,
 } from "../utils/avatarUpload";
+import { buildSalarySummaryFromLogs } from "../utils/competitionHistory";
+import { formatCurrencyFromCents, formatCurrencyInput, parseCurrencyInputToCents } from "../utils/currency";
 import { NAME_MAX_LENGTH, NICKNAME_MAX_LENGTH, normalizeProfileIdentity, validateProfileIdentity } from "../utils/profileIdentity";
 import { avatarFor, canLoadDicebearUrl, isValidDicebearUrl } from "../utils/ranking";
+import { buildTimezoneOptions } from "../utils/timezones";
 import { dailyWorkMinutes, resolveWorkSchedule } from "../utils/workSchedule";
 
 type AvatarStatus = "idle" | "checking" | "valid" | "invalid";
@@ -34,7 +38,7 @@ function saveLocalMonthlySalaryCents(uid: string, monthlySalaryCents: number) {
   window.localStorage.setItem(salaryStorageKey(uid), String(Math.round(monthlySalaryCents)));
 }
 
-export function EditProfilePage({ user }: { user: AppUser }) {
+export function EditProfilePage({ user, appSettings }: { user: AppUser; appSettings: AppSettings }) {
   const { t } = useTranslation("profile");
   const { refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -62,10 +66,10 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     horarioFimAlmoco: user.workSchedule?.horarioFimAlmoco ?? "13:00",
     timezone: user.workSchedule?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
-  const [termsAccepted, setTermsAccepted] = useState(user.termsAccepted === true);
   const [bathroomDurationMinutes, setBathroomDurationMinutes] = useState(user.bathroomDurationMinutes ?? 10);
   const [monthlySalary, setMonthlySalary] = useState("");
   const [salarySummary, setSalarySummary] = useState<SalarySummary | null>(null);
+  const timezoneOptions = useMemo(() => buildTimezoneOptions(), []);
 
   const nameError = validateProfileIdentity(name, { required: true, maxLength: NAME_MAX_LENGTH });
   const nicknameError = validateProfileIdentity(nickname, { maxLength: NICKNAME_MAX_LENGTH });
@@ -111,16 +115,16 @@ export function EditProfilePage({ user }: { user: AppUser }) {
       horarioFimAlmoco: user.workSchedule?.horarioFimAlmoco ?? "13:00",
       timezone: user.workSchedule?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
-    setTermsAccepted(user.termsAccepted === true);
     setBathroomDurationMinutes(user.bathroomDurationMinutes ?? 10);
+    setMonthlySalary(formatCurrencyFromCents(getLocalMonthlySalaryCents(user.uid)));
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [user.uid, user.name, user.nickname, user.avatar, user.email]);
+  }, [cropperImageUrl, uploadedAvatarPreviewUrl, user.avatar, user.email, user.name, user.nickname, user.uid, user.workSchedule, user.bathroomDurationMinutes]);
 
   useEffect(() => {
     void refreshSalarySummary();
-  }, [user.uid]);
+  }, [appSettings.edition, user.uid, user.bathroomDurationMinutes, user.workSchedule]);
 
   useEffect(() => {
     return () => {
@@ -323,32 +327,28 @@ export function EditProfilePage({ user }: { user: AppUser }) {
   async function refreshSalarySummary() {
     try {
       const durationFallback = Math.max(1, Math.min(180, Number(user.bathroomDurationMinutes ?? 10)));
-      const logsSnapshot = await getDocs(query(collection(db, "poop_logs"), where("userId", "==", user.uid)));
-      const totalBathroomMinutes = logsSnapshot.docs.reduce((sum, logDoc) => {
-        const duration = Number(logDoc.data().durationMinutes ?? durationFallback);
-        return sum + (Number.isFinite(duration) ? duration : durationFallback);
-      }, 0);
+      const [logsSnapshot, resetAuditSnapshot] = await Promise.all([
+        getDocs(query(collection(db, "poop_logs"), where("userId", "==", user.uid))),
+        getDocs(competitionResetAuditLogsQuery()),
+      ]);
+      const logs = logsSnapshot.docs.map((logDoc) => ({ id: logDoc.id, ...logDoc.data() }) as PoopLog);
+      const resetAuditLogs = resetAuditSnapshot.docs.map((auditDoc) => ({ id: auditDoc.id, ...auditDoc.data() }) as AdminAuditLog);
       const monthlySalaryCents = getLocalMonthlySalaryCents(user.uid);
       const monthlyWorkMinutes = dailyWorkMinutes(resolveWorkSchedule(user.workSchedule)) * 22;
-      const hourlyRateCents = monthlySalaryCents / Math.max(1, monthlyWorkMinutes / 60);
-      const estimatedEarnedCents = Math.round((monthlySalaryCents / monthlyWorkMinutes) * totalBathroomMinutes);
 
-      setSalarySummary({
-        monthlySalaryCents,
-        estimatedEarnedCents,
-        hourlyRateCents: Math.round(hourlyRateCents),
-        totalBathroomMinutes,
-      });
+      setSalarySummary(
+        buildSalarySummaryFromLogs(
+          logs,
+          monthlySalaryCents,
+          monthlyWorkMinutes,
+          durationFallback,
+          appSettings,
+          resetAuditLogs,
+        ),
+      );
     } catch (error) {
       console.error(error);
     }
-  }
-
-  function formatCurrencyFromCents(value: number) {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value / 100);
   }
 
   async function handleOperationalSubmit(event: FormEvent) {
@@ -357,14 +357,13 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     try {
       await updateUserOperationalProfile(user.uid, {
         workSchedule,
-        termsAccepted,
         bathroomDurationMinutes,
       });
       await refreshProfile();
-      toast.success("Preferencias operacionais salvas.");
+      toast.success(t("operationalSaved"));
     } catch (error) {
       console.error(error);
-      toast.error("Nao foi possivel salvar as preferencias operacionais.");
+      toast.error(t("operationalSaveError"));
     } finally {
       setOperationalBusy(false);
     }
@@ -372,10 +371,9 @@ export function EditProfilePage({ user }: { user: AppUser }) {
 
   async function handleSalarySubmit(event: FormEvent) {
     event.preventDefault();
-    const normalized = monthlySalary.replace(/\./g, "").replace(",", ".");
-    const monthlySalaryCents = Math.round(Number(normalized) * 100);
+    const monthlySalaryCents = parseCurrencyInputToCents(monthlySalary);
     if (!Number.isFinite(monthlySalaryCents) || monthlySalaryCents < 0) {
-      toast.error("Informe um salario mensal valido.");
+      toast.error(t("salaryInvalid"));
       return;
     }
 
@@ -383,11 +381,11 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     try {
       saveLocalMonthlySalaryCents(user.uid, monthlySalaryCents);
       await refreshSalarySummary();
-      setMonthlySalary("");
-      toast.success("Salario salvo neste dispositivo.");
+      setMonthlySalary(formatCurrencyFromCents(monthlySalaryCents));
+      toast.success(t("salarySaved"));
     } catch (error) {
       console.error(error);
-      toast.error("Nao foi possivel salvar o salario neste dispositivo.");
+      toast.error(t("salarySaveError"));
     } finally {
       setSalaryBusy(false);
     }
@@ -427,8 +425,8 @@ export function EditProfilePage({ user }: { user: AppUser }) {
     setUpdateCheckStatus("applying");
 
     try {
-      const updateResult = await triggerPWAUpdate();
-      setUpdateCheckStatus(updateResult === "reloading" ? "pending" : "pending");
+      await triggerPWAUpdate();
+      setUpdateCheckStatus("pending");
       toast.success(t("updatePreparing", { newVersion: latestVersion }));
     } catch (error) {
       console.error(error);
@@ -626,17 +624,15 @@ export function EditProfilePage({ user }: { user: AppUser }) {
 
       <Card>
         <div className="mb-4">
-          <p className="text-sm font-bold text-accent-strong">Expediente e privacidade</p>
-          <h2 className="text-2xl font-black text-fg">Regras para registrar</h2>
-          <p className="mt-1 text-sm text-fg-muted">
-            O backend bloqueia registros fora do expediente, durante o almoço, sem termos aceitos ou sem localização.
-          </p>
+          <p className="text-sm font-bold text-accent-strong">{t("operationalSectionEyebrow")}</p>
+          <h2 className="text-2xl font-black text-fg">{t("operationalSectionTitle")}</h2>
+          <p className="mt-1 text-sm text-fg-muted">{t("operationalSectionDescription")}</p>
         </div>
 
         <form onSubmit={handleOperationalSubmit} className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
-              <span className="mb-2 block text-sm font-bold text-fg-soft">Início do expediente</span>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">{t("workdayStart")}</span>
               <input
                 className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
                 type="time"
@@ -646,7 +642,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
               />
             </label>
             <label>
-              <span className="mb-2 block text-sm font-bold text-fg-soft">Fim do expediente</span>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">{t("workdayEnd")}</span>
               <input
                 className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
                 type="time"
@@ -656,7 +652,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
               />
             </label>
             <label>
-              <span className="mb-2 block text-sm font-bold text-fg-soft">Início do almoço</span>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">{t("lunchStart")}</span>
               <input
                 className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
                 type="time"
@@ -666,7 +662,7 @@ export function EditProfilePage({ user }: { user: AppUser }) {
               />
             </label>
             <label>
-              <span className="mb-2 block text-sm font-bold text-fg-soft">Fim do almoço</span>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">{t("lunchEnd")}</span>
               <input
                 className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
                 type="time"
@@ -679,27 +675,22 @@ export function EditProfilePage({ user }: { user: AppUser }) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
-              <span className="mb-2 block text-sm font-bold text-fg-soft">Timezone</span>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">{t("timezoneLabel")}</span>
               <select
                 className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
                 value={workSchedule.timezone}
                 onChange={(event) => setWorkSchedule((current) => ({ ...current, timezone: event.target.value }))}
                 required
               >
-                <option value="America/Sao_Paulo">America/Sao_Paulo (São Paulo)</option>
-                <option value="America/Fortaleza">America/Fortaleza (Fortaleza)</option>
-                <option value="America/Belem">America/Belem (Belém)</option>
-                <option value="America/Recife">America/Recife (Recife)</option>
-                <option value="America/Manaus">America/Manaus (Manaus)</option>
-                <option value="America/Cuiaba">America/Cuiaba (Cuiabá)</option>
-                <option value="America/Campo_Grande">America/Campo_Grande (Campo Grande)</option>
-                <option value="America/Porto_Velho">America/Porto_Velho (Porto Velho)</option>
-                <option value="America/Boa_Vista">America/Boa_Vista (Boa Vista)</option>
-                <option value="America/Rio_Branco">America/Rio_Branco (Rio Branco)</option>
+                {timezoneOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
-              <span className="mb-2 block text-sm font-bold text-fg-soft">Minutos médios no banheiro</span>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">{t("bathroomDurationLabel")}</span>
               <input
                 className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
                 type="number"
@@ -712,75 +703,85 @@ export function EditProfilePage({ user }: { user: AppUser }) {
             </label>
           </div>
 
-          <label className="rounded-2xl border border-line/10 bg-field p-4">
-            <span className="flex items-start gap-3">
-              <input
-                className="mt-1 h-5 w-5"
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(event) => setTermsAccepted(event.target.checked)}
-                required
-              />
-              <span>
-                <span className="block font-black text-fg">Aceito os Termos de Uso e Responsabilidade de Dados</span>
-                <span className="mt-1 block text-sm text-fg-muted">
-                  Estou ciente de que o PrivadIn coleta latitude e longitude no momento de cada registro,
-                  usa horário local/timezone para validar expediente e salva esses dados para auditoria da competição.
-                </span>
-              </span>
-            </span>
-          </label>
-
           <button
-            disabled={operationalBusy || !termsAccepted}
+            disabled={operationalBusy}
             className="w-full rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg hover:bg-accent-strong disabled:opacity-60 sm:w-auto"
           >
-            {operationalBusy ? "Salvando..." : "Salvar regras e termos"}
+            {operationalBusy ? t("operationalSaving") : t("operationalSave")}
           </button>
         </form>
       </Card>
 
       <Card>
         <div className="mb-4">
-          <p className="text-sm font-bold text-accent-strong">Salário local</p>
-          <h2 className="text-2xl font-black text-fg">Ganhos no banheiro</h2>
-          <p className="mt-1 text-sm text-fg-muted">
-            O salário fica salvo somente no localStorage deste navegador.
-          </p>
+          <p className="text-sm font-bold text-accent-strong">{t("salarySectionEyebrow")}</p>
+          <h2 className="text-2xl font-black text-fg">{t("salarySectionTitle")}</h2>
+          <p className="mt-1 text-sm text-fg-muted">{t("salarySectionDescription")}</p>
         </div>
 
         <form onSubmit={handleSalarySubmit} className="grid gap-4 sm:grid-cols-[1fr_auto]">
           <label>
-            <span className="mb-2 block text-sm font-bold text-fg-soft">Salário mensal</span>
+            <span className="mb-2 block text-sm font-bold text-fg-soft">{t("salaryInputLabel")}</span>
             <input
               className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
-              inputMode="decimal"
+              inputMode="numeric"
               value={monthlySalary}
-              onChange={(event) => setMonthlySalary(event.target.value)}
-              placeholder="5000,00"
+              onChange={(event) => setMonthlySalary(formatCurrencyInput(event.target.value))}
+              placeholder={t("salaryPlaceholder")}
             />
           </label>
           <button
             disabled={salaryBusy}
             className="self-end rounded-2xl bg-panel-strong px-5 py-3 font-black text-fg hover:bg-panel-subtle disabled:opacity-60"
           >
-            {salaryBusy ? "Salvando..." : "Salvar salário"}
+            {salaryBusy ? t("operationalSaving") : t("salarySave")}
           </button>
         </form>
 
         {salarySummary ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-line/10 bg-field p-4">
-              <p className="text-xs font-bold text-fg-muted">Salário salvo</p>
-              <p className="mt-1 text-xl font-black text-fg">{formatCurrencyFromCents(salarySummary.monthlySalaryCents)}</p>
+          <div className="mt-4 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-4">
+              <div className="rounded-2xl border border-line/10 bg-field p-4">
+                <p className="text-xs font-bold text-fg-muted">{t("salarySavedLabel")}</p>
+                <p className="mt-1 text-xl font-black text-fg">{formatCurrencyFromCents(salarySummary.monthlySalaryCents)}</p>
+              </div>
+              <div className="rounded-2xl border border-line/10 bg-field p-4">
+                <p className="text-xs font-bold text-fg-muted">{t("currentCompetitionEarned")}</p>
+                <p className="mt-1 text-xl font-black text-accent-strong">{formatCurrencyFromCents(salarySummary.currentCompetitionEarnedCents)}</p>
+              </div>
+              <div className="rounded-2xl border border-line/10 bg-field p-4">
+                <p className="text-xs font-bold text-fg-muted">{t("totalEarned")}</p>
+                <p className="mt-1 text-xl font-black text-accent-strong">{formatCurrencyFromCents(salarySummary.totalEarnedCents)}</p>
+              </div>
+              <div className="rounded-2xl border border-line/10 bg-field p-4">
+                <p className="text-xs font-bold text-fg-muted">{t("totalBathroomTime")}</p>
+                <p className="mt-1 text-xl font-black text-fg">{salarySummary.totalBathroomMinutes} min</p>
+              </div>
             </div>
+
             <div className="rounded-2xl border border-line/10 bg-field p-4">
-              <p className="text-xs font-bold text-fg-muted">Tempo registrado</p>
-              <p className="mt-1 text-xl font-black text-fg">{salarySummary.totalBathroomMinutes} min</p>
-            </div>
-            <div className="rounded-2xl border border-line/10 bg-field p-4">
-              <p className="text-xs font-bold text-fg-muted">Ganho estimado</p>
-              <p className="mt-1 text-xl font-black text-accent-strong">{formatCurrencyFromCents(salarySummary.estimatedEarnedCents)}</p>
+              <div className="mb-3">
+                <p className="text-xs font-bold text-fg-muted">{t("historyTitle")}</p>
+                <p className="text-sm text-fg-muted">{t("historyDescription")}</p>
+              </div>
+
+              {salarySummary.competitionHistory.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-line/15 p-6 text-center text-fg-muted">
+                  {t("historyEmpty")}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {salarySummary.competitionHistory.map((entry) => (
+                    <div key={entry.edition} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line/10 bg-panel px-4 py-3">
+                      <div>
+                        <p className="font-black text-fg">{t("competitionLabel", { edition: entry.edition })}</p>
+                        <p className="text-xs text-fg-muted">{entry.logsCount} registros · {entry.totalBathroomMinutes} min</p>
+                      </div>
+                      <p className="text-lg font-black text-accent-strong">{formatCurrencyFromCents(entry.earnedCents)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : null}

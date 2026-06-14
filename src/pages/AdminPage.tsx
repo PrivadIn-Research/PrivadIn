@@ -15,11 +15,14 @@ import type {
 import { adjustUserPoints, removeLog, resetWeeklyRanking } from "../services/poopService";
 import {
   MAX_COMPETITION_ANNOUNCEMENT_LENGTH,
+  MAX_TERMS_OF_USE_LENGTH,
   normalizeCompetitionAnnouncement,
+  normalizeTermsOfUseText,
   updateBonusTimeRanges,
   updateCompetitionAnnouncement,
   updateCooldownMinutes,
   updatePointsPerLog,
+  updateTermsOfUse,
 } from "../services/settingsService";
 import { deactivateUser, reactivateUser, setUserCooldown } from "../services/userService";
 import { formatDateTime } from "../utils/date";
@@ -100,6 +103,7 @@ export function AdminPage({
     (appSettings as any).bonusTimeRanges ?? [],
   );
   const [announcementInput, setAnnouncementInput] = useState(appSettings.competitionAnnouncement ?? "");
+  const [termsInput, setTermsInput] = useState(appSettings.termsOfUseText ?? "");
 
   useEffect(() => {
     setCooldownInput(String(appSettings.cooldownMinutes));
@@ -113,6 +117,10 @@ export function AdminPage({
     setAnnouncementInput(appSettings.competitionAnnouncement ?? "");
   }, [appSettings.competitionAnnouncement]);
 
+  useEffect(() => {
+    setTermsInput(appSettings.termsOfUseText ?? "");
+  }, [appSettings.termsOfUseText]);
+
   const parsedCooldown = Number(cooldownInput);
   const isCooldownValid =
     Number.isInteger(parsedCooldown) && parsedCooldown >= 1 && parsedCooldown <= 1440;
@@ -120,6 +128,7 @@ export function AdminPage({
   const isPointsValid =
     Number.isInteger(parsedPoints) && parsedPoints >= 1 && parsedPoints <= 100000;
   const normalizedAnnouncement = normalizeCompetitionAnnouncement(announcementInput);
+  const normalizedTerms = normalizeTermsOfUseText(termsInput);
   const usersById = useMemo(() => buildUsersById(users), [users]);
 
   async function runAdminAction(action: () => Promise<void>, success: string) {
@@ -336,6 +345,42 @@ export function AdminPage({
               className="rounded-2xl border border-line/10 bg-panel px-5 py-3 font-black text-fg transition hover:bg-panel-strong disabled:opacity-60"
             >
               {t("actions.saveAnnouncement")}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <h3 className="text-sm font-bold text-fg-soft">{t("termsTitle")}</h3>
+          <p className="mt-1 text-sm text-fg-muted">
+            {t("termsDescription", { version: appSettings.termsOfUseVersion ?? 1 })}
+          </p>
+          <label className="mt-3 block">
+            <textarea
+              className="min-h-40 w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
+              maxLength={MAX_TERMS_OF_USE_LENGTH}
+              value={termsInput}
+              onChange={(event) => setTermsInput(event.target.value)}
+              placeholder={t("termsPlaceholder")}
+            />
+          </label>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-fg-muted">
+              {t("termsCounter", {
+                count: normalizedTerms.length,
+                max: MAX_TERMS_OF_USE_LENGTH,
+              })}
+            </p>
+            <button
+              disabled={busy || normalizedTerms === normalizeTermsOfUseText(appSettings.termsOfUseText ?? "")}
+              onClick={() =>
+                runAdminAction(
+                  () => updateTermsOfUse(admin, termsInput),
+                  t("toast.termsSaved", { version: (appSettings.termsOfUseVersion ?? 1) + 1 }),
+                )
+              }
+              className="rounded-2xl border border-line/10 bg-panel px-5 py-3 font-black text-fg transition hover:bg-panel-strong disabled:opacity-60"
+            >
+              {t("actions.saveTerms")}
             </button>
           </div>
         </div>

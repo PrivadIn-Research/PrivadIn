@@ -32,6 +32,7 @@ import {
 } from "../utils/workSchedule";
 import i18n from "../i18n";
 import { RegisterPoopError } from "../utils/registerPoopError";
+import { getCurrentTermsVersion, hasAcceptedCurrentTerms } from "../utils/terms";
 
 export const usersRef = collection(db, "users");
 export const logsRef = collection(db, "poop_logs");
@@ -92,6 +93,10 @@ export function adminAuditLogsQuery() {
   return query(adminLogsRef, orderBy("createdAt", "desc"));
 }
 
+export function competitionResetAuditLogsQuery() {
+  return query(adminLogsRef, where("action", "==", "reset_weekly"), orderBy("createdAt", "desc"));
+}
+
 function resolvePointsPerLog(
   settings: Record<string, unknown> | undefined,
   localTime: string,
@@ -146,7 +151,10 @@ export async function registerPoopWithValidation(
     throw new RegisterPoopError("deactivated_user", i18n.t("auth:deactivated_user"));
   }
 
-  if (user.termsAccepted !== true) {
+  const currentTermsVersion = getCurrentTermsVersion({
+    termsOfUseVersion: undefined,
+  });
+  if (!hasAcceptedCurrentTerms(user, { termsOfUseVersion: currentTermsVersion })) {
     throw new RegisterPoopError(
       "missing_terms",
       i18n.t("services:poop.missingTerms"),
@@ -211,8 +219,19 @@ export async function registerPoopWithValidation(
     }
 
     const settings = settingsSnapshot.data();
+    const currentTermsVersion = getCurrentTermsVersion({
+      termsOfUseVersion: Number(settings?.termsOfUseVersion ?? undefined),
+    });
+    if (!hasAcceptedCurrentTerms(currentUser, { termsOfUseVersion: currentTermsVersion })) {
+      throw new RegisterPoopError(
+        "missing_terms",
+        i18n.t("services:poop.missingTerms"),
+        "profile",
+      );
+    }
     const resolvedPoints = resolvePointsPerLog(settings, localTime, pointsPerLog);
     const resolvedCooldownMinutes = Math.max(0, Number(settings?.cooldownMinutes ?? cooldownMinutes));
+    const currentEdition = Math.max(1, Math.trunc(Number(settings?.edition ?? 1)));
     const durationMinutes = Math.max(1, Math.min(180, Number(currentUser.bathroomDurationMinutes ?? 10)));
     const nextCooldown = Timestamp.fromMillis(now.toMillis() + resolvedCooldownMinutes * 60_000);
     const nextLogs = [
@@ -223,6 +242,7 @@ export async function registerPoopWithValidation(
         createdAt: now,
         points: resolvedPoints,
         isWeeklyActive: true,
+        competitionEdition: currentEdition,
       },
       ...userLogs,
     ];
@@ -237,6 +257,7 @@ export async function registerPoopWithValidation(
       timezone: schedule.timezone,
       localTime,
       durationMinutes,
+      competitionEdition: currentEdition,
     });
     transaction.update(userRef, {
       totalPoints: increment(resolvedPoints),
@@ -277,6 +298,8 @@ export async function registerPoop(
   }
 
   const now = Timestamp.now();
+  const settingsSnapshot = await getDoc(appSettingsDocRef);
+  const currentEdition = Math.max(1, Math.trunc(Number(settingsSnapshot.data()?.edition ?? 1)));
   const nextLogs = [
     {
       id: "pending",
@@ -285,6 +308,7 @@ export async function registerPoop(
       createdAt: now,
       points: pointsPerLog,
       isWeeklyActive: true,
+      competitionEdition: currentEdition,
     },
     ...userLogs,
   ];
@@ -296,6 +320,7 @@ export async function registerPoop(
     createdAt: now,
     points: pointsPerLog,
     isWeeklyActive: true,
+    competitionEdition: currentEdition,
   });
 
   await updateDoc(userDoc, {
@@ -314,8 +339,10 @@ export async function registerPoop(
 export async function adjustUserPoints(admin: AppUser, targetUser: AppUser, delta: number) {
   const userDoc = doc(db, "users", targetUser.uid);
   const targetSnapshot = await getDoc(userDoc);
+  const settingsSnapshot = await getDoc(appSettingsDocRef);
   const targetData = targetSnapshot.data() as AppUser | undefined;
   const targetName = targetData?.name ?? targetUser.name;
+  const currentEdition = Math.max(1, Math.trunc(Number(settingsSnapshot.data()?.edition ?? 1)));
   const now = Timestamp.now();
 
   if (delta > 0) {
@@ -326,6 +353,7 @@ export async function adjustUserPoints(admin: AppUser, targetUser: AppUser, delt
       createdAt: now,
       points: delta,
       isWeeklyActive: true,
+      competitionEdition: currentEdition,
     });
     batch.update(userDoc, {
       totalPoints: increment(delta),

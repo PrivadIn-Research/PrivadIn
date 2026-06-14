@@ -1,8 +1,15 @@
-import { Timestamp, doc, writeBatch } from "@firebase/firestore";
+import { Timestamp, doc, getDoc, writeBatch } from "@firebase/firestore";
 import type { AppSettings, AppUser } from "../types";
 import { db } from "./firebase";
 import { adminLogsRef, createAuditLog } from "./poopService";
 import { DEFAULT_COOLDOWN_MINUTES } from "../utils/date";
+import {
+  DEFAULT_TERMS_OF_USE_TEXT,
+  getCurrentTermsVersion,
+  INITIAL_TERMS_OF_USE_VERSION,
+  MAX_TERMS_OF_USE_LENGTH,
+  normalizeTermsOfUseText,
+} from "../utils/terms";
 
 export const APP_SETTINGS_DOC_ID = "global";
 export const appSettingsDocRef = doc(db, "app_settings", APP_SETTINGS_DOC_ID);
@@ -20,6 +27,8 @@ export const defaultAppSettings: AppSettings = {
   pointsPerLog: DEFAULT_POINTS_PER_LOG,
   edition: DEFAULT_EDITION,
   overallRankingVisible: false,
+  termsOfUseText: DEFAULT_TERMS_OF_USE_TEXT,
+  termsOfUseVersion: INITIAL_TERMS_OF_USE_VERSION,
   competitionAnnouncement: "",
 };
 
@@ -60,6 +69,10 @@ export function parseAppSettings(
     ),
     edition: normalizeEdition(Number(data?.edition ?? DEFAULT_EDITION)),
     overallRankingVisible: data?.overallRankingVisible === true,
+    termsOfUseText: normalizeTermsOfUseText(String(data?.termsOfUseText ?? DEFAULT_TERMS_OF_USE_TEXT)) || DEFAULT_TERMS_OF_USE_TEXT,
+    termsOfUseVersion: getCurrentTermsVersion({
+      termsOfUseVersion: Number(data?.termsOfUseVersion ?? INITIAL_TERMS_OF_USE_VERSION),
+    }),
     competitionAnnouncement: String(data?.competitionAnnouncement ?? "").trim().slice(0, MAX_COMPETITION_ANNOUNCEMENT_LENGTH),
   };
 }
@@ -152,6 +165,40 @@ export async function updatePointsPerLog(
 
 export function normalizeCompetitionAnnouncement(value: string) {
   return value.trim().slice(0, MAX_COMPETITION_ANNOUNCEMENT_LENGTH);
+}
+
+export { MAX_TERMS_OF_USE_LENGTH, normalizeTermsOfUseText };
+
+export async function updateTermsOfUse(admin: AppUser, termsOfUseText: string) {
+  const normalizedTerms = normalizeTermsOfUseText(termsOfUseText) || DEFAULT_TERMS_OF_USE_TEXT;
+  const currentSettingsSnapshot = await getDoc(appSettingsDocRef);
+  const currentVersion = getCurrentTermsVersion({
+    termsOfUseVersion: Number(currentSettingsSnapshot.data()?.termsOfUseVersion ?? INITIAL_TERMS_OF_USE_VERSION),
+  });
+  const batch = writeBatch(db);
+
+  batch.set(
+    appSettingsDocRef,
+    {
+      termsOfUseText: normalizedTerms,
+      termsOfUseVersion: currentVersion + 1,
+      termsOfUseUpdatedAt: Timestamp.now(),
+      termsOfUseUpdatedBy: admin.uid,
+      updatedAt: Timestamp.now(),
+      updatedBy: admin.uid,
+    },
+    { merge: true },
+  );
+
+  batch.set(
+    doc(adminLogsRef),
+    createAuditLog({
+      action: "update_terms_of_use",
+      admin,
+    }),
+  );
+
+  await batch.commit();
 }
 
 export async function updateCompetitionAnnouncement(admin: AppUser, announcement: string) {

@@ -17,7 +17,7 @@ import { FirebaseError } from "@firebase/app";
 import { Timestamp, doc, getDoc, serverTimestamp, setDoc } from "@firebase/firestore";
 import i18n from "../i18n";
 import { auth, db, isFirebaseConfigured } from "../services/firebase";
-import type { AppUser, RegistrationRequest } from "../types";
+import type { AppSettings, AppUser, RegistrationRequest } from "../types";
 import { avatarFor } from "../utils/ranking";
 import {
   createRegistrationAttempt,
@@ -28,18 +28,25 @@ import {
 } from "../services/registrationService";
 import { isUserNameTaken } from "../services/userService";
 import { AuthLoginError, firebaseAuthErrorCode } from "../utils/authErrors";
+import { acceptTermsOfUse } from "../services/userService";
+import { appSettingsDocRef, parseAppSettings } from "../services/settingsService";
+import { getCurrentTermsVersion, hasAcceptedCurrentTerms } from "../utils/terms";
 
 type AuthResult =
   | { status: "signed_in" }
+  | { status: "terms_required" }
   | { status: "access_code_required"; request: RegistrationRequest };
 
 interface AuthContextValue {
   firebaseUser: User | null;
   user: AppUser | null;
+  pendingTermsUser: AppUser | null;
+  currentAppSettings: AppSettings | null;
   loading: boolean;
   login: (email: string, password: string, approvalCode?: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  acceptPendingTerms: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -125,6 +132,11 @@ async function ensureUserProfile(firebaseUser: User) {
   });
 }
 
+async function loadAppSettings() {
+  const settingsSnapshot = await getDoc(appSettingsDocRef);
+  return parseAppSettings(settingsSnapshot.data() as Partial<AppSettings> | undefined);
+}
+
 async function registerWithApprovalCode(email: string, password: string, approvalCode: string) {
   const normalizedEmail = normalizeEmail(email);
   const request = await getRegistrationRequest(normalizedEmail);
@@ -205,6 +217,8 @@ async function registerWithApprovalCode(email: string, password: string, approva
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
+  const [pendingTermsUser, setPendingTermsUser] = useState<AppUser | null>(null);
+  const [currentAppSettings, setCurrentAppSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -217,15 +231,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setFirebaseUser(nextUser);
       if (!nextUser) {
         setUser(null);
+        setPendingTermsUser(null);
         setLoading(false);
         return;
       }
 
       try {
-        setUser(await ensureUserProfile(nextUser));
+        const [profile, appSettings] = await Promise.all([ensureUserProfile(nextUser), loadAppSettings()]);
+        setCurrentAppSettings(appSettings);
+        if (hasAcceptedCurrentTerms(profile, appSettings)) {
+          setPendingTermsUser(null);
+          setUser(profile);
+        } else {
+          setUser(null);
+          setPendingTermsUser(profile);
+        }
       } catch (error) {
         console.error(error);
         setUser(null);
+        setPendingTermsUser(null);
         await signOut(auth);
       } finally {
         setLoading(false);
@@ -239,6 +263,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       firebaseUser,
       user,
+      pendingTermsUser,
+      currentAppSettings,
       loading,
       login: async (email, password, approvalCode) => {
         if (!isFirebaseConfigured) {
@@ -254,16 +280,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               password,
               approvalCode,
             );
+            const appSettings = await loadAppSettings();
+            setCurrentAppSettings(appSettings);
             setFirebaseUser(credential.user);
-            setUser(profile);
-            return { status: "signed_in" };
+            if (hasAcceptedCurrentTerms(profile, appSettings)) {
+              setPendingTermsUser(null);
+              setUser(profile);
+              return { status: "signed_in" };
+            }
+            setUser(null);
+            setPendingTermsUser(profile);
+            return { status: "terms_required" };
           }
 
           const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
           const profile = await ensureUserProfile(credential.user);
+          const appSettings = await loadAppSettings();
+          setCurrentAppSettings(appSettings);
           setFirebaseUser(credential.user);
-          setUser(profile);
-          return { status: "signed_in" };
+          if (hasAcceptedCurrentTerms(profile, appSettings)) {
+            setPendingTermsUser(null);
+            setUser(profile);
+            return { status: "signed_in" };
+          }
+          setUser(null);
+          setPendingTermsUser(profile);
+          return { status: "terms_required" };
         } catch (error) {
           if (!approvalCode?.trim() && isMissingAccountError(error)) {
             const request = await getOrCreateRegistrationRequest(normalizedEmail);
@@ -293,13 +335,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
       },
-      logout: () => signOut(auth),
+      logout: async () => {
+        setPendingTermsUser(null);
+        setCurrentAppSettings(null);
+        await signOut(auth);
+      },
       refreshProfile: async () => {
         if (!firebaseUser) return;
-        setUser(await ensureUserProfile(firebaseUser));
+        const [profile, appSettings] = await Promise.all([ensureUserProfile(firebaseUser), loadAppSettings()]);
+        setCurrentAppSettings(appSettings);
+        if (hasAcceptedCurrentTerms(profile, appSettings)) {
+          setPendingTermsUser(null);
+          setUser(profile);
+          return;
+        }
+        setUser(null);
+        setPendingTermsUser(profile);
+      },
+      acceptPendingTerms: async () => {
+        if (!firebaseUser) return;
+        const appSettings = currentAppSettings ?? await loadAppSettings();
+        const updatedProfile = await acceptTermsOfUse(firebaseUser.uid, getCurrentTermsVersion(appSettings));
+        setCurrentAppSettings(appSettings);
+        setPendingTermsUser(null);
+        setUser(assertActiveUserProfile({
+          ...updatedProfile,
+          createdAt: updatedProfile.createdAt ?? Timestamp.now(),
+        }));
       },
     }),
-    [firebaseUser, loading, user],
+    [currentAppSettings, firebaseUser, loading, pendingTermsUser, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -95,6 +95,10 @@ export function formatAuditLogMessage(
       return t("auditMessages.updateCompetitionAnnouncement", {
         admin: adminName,
       });
+    case "update_terms_of_use":
+      return t("auditMessages.updateTermsOfUse", {
+        admin: adminName,
+      });
   }
 
   return auditLog.description ?? t("auditMessages.unknown");

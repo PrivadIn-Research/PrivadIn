@@ -22,6 +22,11 @@ i18n.addResources("pt-BR", "dashboard", {
 });
 
 i18n.addResources("pt-BR", "profile", {
+  userIdEyebrow: "Identificador",
+  userIdTitle: "Seu ID para Poopcoins",
+  userIdCopy: "Copiar ID",
+  userIdCopied: "ID copiado.",
+  userIdCopyError: "Nao foi possivel copiar o ID.",
   updatePreparing: "Atualizacao {{newVersion}} encontrada. Preparando a nova versao...",
   applyUpdateButton: "Atualizar para {{version}}",
   applyUpdateLoading: "Aplicando atualizacao...",
@@ -95,9 +100,30 @@ i18n.addResources("pt-BR", "admin", {
   termsCounter: "{{count}}/{{max}} caracteres",
   auditMessages: {
     updateTermsOfUse: "{{admin}} publicou uma nova versao dos termos de uso.",
+    adjustPoopcoins: "{{admin}} ajustou {{direction}}{{count}} Poopcoins para {{target}}.",
+    reversePoopcoinTransaction: "{{admin}} reverteu uma transacao Poopcoin.",
+    migratePoopcoins: "{{admin}} migrou {{count}} Poopcoins de logs antigos.",
   },
   actionLabels: {
     update_terms_of_use: "Termos publicados",
+    adjust_poopcoins: "Ajuste de Poopcoins",
+    reverse_poopcoin_transaction: "Reversao de Poopcoins",
+    migrate_poopcoins: "Migracao de Poopcoins",
+  },
+});
+
+i18n.addResources("pt-BR", "shell", {
+  nav: {
+    poopcoins: "Poopcoins",
+  },
+});
+
+i18n.addResources("pt-BR", "cuiter", {
+  unlockInfo: "Voce precisa de pelo menos 1 Poopcoin para publicar no Cuiter.",
+  credits_one: "{{chars}} caracteres restantes · {{count}} Poopcoin disponivel",
+  credits_other: "{{chars}} caracteres restantes · {{count}} Poopcoins disponiveis",
+  service: {
+    missingCredits: "Saldo insuficiente. Registre uma cagada validada para ganhar 1 Poopcoin.",
   },
 });
 
@@ -107,6 +133,11 @@ i18n.addResources("en-US", "dashboard", {
 });
 
 i18n.addResources("en-US", "profile", {
+  userIdEyebrow: "Identifier",
+  userIdTitle: "Your Poopcoins ID",
+  userIdCopy: "Copy ID",
+  userIdCopied: "ID copied.",
+  userIdCopyError: "Could not copy the ID.",
   updatePreparing: "Update {{newVersion}} found. Preparing the new version...",
   applyUpdateButton: "Update to {{version}}",
   applyUpdateLoading: "Applying update...",
@@ -180,9 +211,30 @@ i18n.addResources("en-US", "admin", {
   termsCounter: "{{count}}/{{max}} characters",
   auditMessages: {
     updateTermsOfUse: "{{admin}} published a new terms of use version.",
+    adjustPoopcoins: "{{admin}} adjusted {{direction}}{{count}} Poopcoins for {{target}}.",
+    reversePoopcoinTransaction: "{{admin}} reversed a Poopcoin transaction.",
+    migratePoopcoins: "{{admin}} migrated {{count}} Poopcoins from old logs.",
   },
   actionLabels: {
     update_terms_of_use: "Terms published",
+    adjust_poopcoins: "Poopcoins adjustment",
+    reverse_poopcoin_transaction: "Poopcoins reversal",
+    migrate_poopcoins: "Poopcoins migration",
+  },
+});
+
+i18n.addResources("en-US", "shell", {
+  nav: {
+    poopcoins: "Poopcoins",
+  },
+});
+
+i18n.addResources("en-US", "cuiter", {
+  unlockInfo: "You need at least 1 Poopcoin to publish on Cuiter.",
+  credits_one: "{{chars}} characters left · {{count}} Poopcoin available",
+  credits_other: "{{chars}} characters left · {{count}} Poopcoins available",
+  service: {
+    missingCredits: "Insufficient balance. Log a validated break to earn 1 Poopcoin.",
   },
 });
 

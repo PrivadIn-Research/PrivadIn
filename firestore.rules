@@ -30,13 +30,102 @@ service cloud.firestore {
         "uid", "email", "role", "totalPoints", "weeklyPoints",
         "currentDailyStreak", "currentWeeklyStreak", "bestStreak",
         "createdAt", "firstLogAt", "lastLogAt", "cooldownUntil",
-        "isActive", "deactivatedAt", "deactivatedBy"
+        "isActive", "deactivatedAt", "deactivatedBy",
+        "poopcoinBalance", "poopcoinMigratedAt"
       ];
     }
 
     // Garante que o update não está tentando modificar os campos protegidos acima
     function ownerKeepsProtectedUserFields() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(userProtectedFields());
+    }
+
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function validPoopcoinHash(hash) {
+      return hash is string && hash.matches("^[a-f0-9]{64}$");
+    }
+
+    function validPoopcoinEntry(entry) {
+      return entry is map
+        && entry.keys().hasOnly(["userId", "delta"])
+        && entry.userId is string
+        && entry.userId.size() > 0
+        && entry.userId.size() <= 128
+        && entry.delta is int
+        && entry.delta != 0
+        && entry.delta >= -100000
+        && entry.delta <= 100000;
+    }
+
+    function validPoopcoinEntries(entries) {
+      return entries is list
+        && entries.size() >= 1
+        && entries.size() <= 2
+        && validPoopcoinEntry(entries[0])
+        && (entries.size() == 1 || validPoopcoinEntry(entries[1]));
+    }
+
+    function validPoopcoinTransaction() {
+      return request.resource.data.keys().hasOnly([
+          "hash", "previousHash", "sequence", "createdAt", "type", "entries",
+          "affectedUserIds", "fromUserId", "toUserId", "amount", "createdBy",
+          "createdByRole", "status", "reversesTransactionHash",
+          "reversedByTransactionHash", "linkedLogId", "linkedPostId", "reason",
+          "nonce"
+        ])
+        && validPoopcoinHash(request.resource.data.hash)
+        && validPoopcoinHash(request.resource.data.previousHash)
+        && request.resource.data.sequence is int
+        && request.resource.data.sequence > 0
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.type in [
+          "mint_log", "legacy_mint", "transfer", "cuiter_spend",
+          "admin_adjustment", "reversal"
+        ]
+        && validPoopcoinEntries(request.resource.data.entries)
+        && request.resource.data.affectedUserIds is list
+        && request.resource.data.affectedUserIds.size() >= 1
+        && request.resource.data.affectedUserIds.size() <= 2
+        && request.resource.data.amount is int
+        && request.resource.data.amount > 0
+        && request.resource.data.amount <= 100000
+        && request.resource.data.createdBy is string
+        && request.resource.data.createdByRole in ["player", "admin"]
+        && request.resource.data.status == "active"
+        && request.resource.data.nonce is string
+        && request.resource.data.nonce.size() <= 64
+        && (!("reason" in request.resource.data) || request.resource.data.reason == null || (request.resource.data.reason is string && request.resource.data.reason.size() <= 240));
+    }
+
+    function userCanCreatePoopcoinTransaction() {
+      return signedIn()
+        && validPoopcoinTransaction()
+        && request.resource.data.createdBy == request.auth.uid
+        && (
+          request.resource.data.type in ["mint_log", "transfer", "cuiter_spend"]
+          || isAdmin()
+        );
+    }
+
+    function canUpdatePoopcoinBalance(userId) {
+      return signedIn()
+        && changedOnly(["poopcoinBalance", "poopcoinMigratedAt"])
+        && request.resource.data.poopcoinBalance is number
+        && request.resource.data.poopcoinBalance >= -100000
+        && request.resource.data.poopcoinBalance <= 1000000
+        && (
+          isOwner(userId)
+          || isAdmin()
+          || (
+            existsAfter(/databases/$(database)/documents/poopcoin_chain/head)
+            && existsAfter(/databases/$(database)/documents/poopcoin_transactions/$(getAfter(/databases/$(database)/documents/poopcoin_chain/head).data.lastHash))
+            && getAfter(/databases/$(database)/documents/poopcoin_transactions/$(getAfter(/databases/$(database)/documents/poopcoin_chain/head).data.lastHash)).data.createdBy == request.auth.uid
+            && getAfter(/databases/$(database)/documents/poopcoin_transactions/$(getAfter(/databases/$(database)/documents/poopcoin_chain/head).data.lastHash)).data.affectedUserIds.hasAny([userId])
+          )
+        );
     }
 
 
@@ -50,7 +139,7 @@ service cloud.firestore {
       // Permite criar se for o dono
       allow create: if isOwner(userId) && isPlayerRoleOnCreate();
       // Admin edita tudo. Dono edita o que quiser, desde que não trapaceie os pontos/status
-      allow update: if isAdmin() || (isOwner(userId) && ownerKeepsProtectedUserFields());
+      allow update: if isAdmin() || (isOwner(userId) && ownerKeepsProtectedUserFields()) || canUpdatePoopcoinBalance(userId);
       allow delete: if false;
     }
 
@@ -101,6 +190,33 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if false;
+    }
+
+    // LEDGER PUBLICO DE POOPCOINS
+    match /poopcoin_transactions/{transactionHash} {
+      allow read: if signedIn();
+      allow create: if transactionHash == request.resource.data.hash && userCanCreatePoopcoinTransaction();
+      allow update: if isAdmin()
+        && changedOnly(["status", "reversedByTransactionHash"])
+        && request.resource.data.status in ["active", "reversed"]
+        && request.resource.data.hash == resource.data.hash
+        && request.resource.data.previousHash == resource.data.previousHash
+        && request.resource.data.sequence == resource.data.sequence;
+      allow delete: if false;
+    }
+
+    // CABECA DO ENCADEAMENTO POOPCOIN
+    match /poopcoin_chain/{chainDoc} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && chainDoc == "head"
+        && request.resource.data.keys().hasOnly(["lastHash", "lastSequence", "updatedAt"])
+        && validPoopcoinHash(request.resource.data.lastHash)
+        && request.resource.data.lastSequence is int
+        && request.resource.data.lastSequence > 0
+        && request.resource.data.updatedAt is timestamp
+        && existsAfter(/databases/$(database)/documents/poopcoin_transactions/$(request.resource.data.lastHash));
+      allow delete: if false;
     }
   }
 }

@@ -1,12 +1,14 @@
 import {
   Timestamp,
-  addDoc,
   collection,
+  doc,
   getCountFromServer,
   getDocs,
+  increment,
   limit,
   orderBy,
   query,
+  runTransaction,
   startAfter,
   where,
   type DocumentData,
@@ -16,6 +18,7 @@ import { db } from "./firebase";
 import i18n from "../i18n";
 import type { AppUser, CuiterPost } from "../types";
 import { countGraphemes } from "../utils/grapheme";
+import { appendPoopcoinTransaction } from "./poopcoinService";
 
 export const CUITER_MAX_CHARS = 80;
 export const CUITER_PAGE_SIZE = 10;
@@ -24,13 +27,15 @@ export const cuiterPostsRef = collection(db, "cuiter_posts");
 
 type CuiterPageCursor = QueryDocumentSnapshot<DocumentData> | null;
 
-function mapPost(doc: QueryDocumentSnapshot<DocumentData>) {
-  return { id: doc.id, ...doc.data() } as CuiterPost;
+function mapPost(docSnapshot: QueryDocumentSnapshot<DocumentData>) {
+  return { id: docSnapshot.id, ...docSnapshot.data() } as CuiterPost;
 }
 
 export async function fetchCuiterPostsPage(cursor: CuiterPageCursor, pageSize = CUITER_PAGE_SIZE) {
   const baseQuery = query(cuiterPostsRef, orderBy("createdAt", "desc"), limit(pageSize));
-  const paginatedQuery = cursor ? query(cuiterPostsRef, orderBy("createdAt", "desc"), startAfter(cursor), limit(pageSize)) : baseQuery;
+  const paginatedQuery = cursor
+    ? query(cuiterPostsRef, orderBy("createdAt", "desc"), startAfter(cursor), limit(pageSize))
+    : baseQuery;
   const snapshot = await getDocs(paginatedQuery);
   const docs = snapshot.docs;
   return {
@@ -55,31 +60,15 @@ export function isCuiterCreditEligibleLog(createdAtMs: number) {
   return createdAtMs >= CUITER_CREDIT_START_DATE.getTime();
 }
 
-export function getCuiterAvailableCredits(userLogsCount: number, userPostsCount: number) {
-  return Math.max(0, userLogsCount - userPostsCount);
+export function getCuiterAvailableCredits(user: AppUser) {
+  return Math.max(0, Math.trunc(Number(user.poopcoinBalance ?? 0)));
 }
 
-export function canPostOnCuiter(user: AppUser, userLogsCount: number, userPostsCount: number) {
-  if (!user.lastLogAt && !user.firstLogAt) return false;
-  return getCuiterAvailableCredits(userLogsCount, userPostsCount) > 0;
+export function canPostOnCuiter(user: AppUser) {
+  return getCuiterAvailableCredits(user) > 0;
 }
 
-export async function createCuiterPost(
-  user: AppUser,
-  message: string,
-  userLogsCount: number,
-) {
-  if (!user.lastLogAt && !user.firstLogAt) {
-    throw new Error(i18n.t("cuiter:service.missingLog"));
-  }
-
-  const currentPostsCount = await countUserCuiterPosts(user.uid);
-  const availableCredits = getCuiterAvailableCredits(userLogsCount, currentPostsCount);
-
-  if (availableCredits <= 0) {
-    throw new Error("Sem créditos suficientes. Registre uma nova cagada para liberar um novo post.");
-  }
-
+export async function createCuiterPost(user: AppUser, message: string) {
   const normalizedMessage = message.trim();
   if (!normalizedMessage) {
     throw new Error(i18n.t("cuiter:service.emptyMessage"));
@@ -90,17 +79,50 @@ export async function createCuiterPost(
   }
 
   const createdAt = Timestamp.now();
-  const docRef = await addDoc(cuiterPostsRef, {
-    userId: user.uid,
-    userName: user.nickname?.trim() || user.name,
-    message: normalizedMessage,
-    createdAt,
+  const postRef = doc(cuiterPostsRef);
+  let poopcoinTransactionHash = "";
+
+  await runTransaction(db, async (transaction) => {
+    const userRef = doc(db, "users", user.uid);
+    const userSnapshot = await transaction.get(userRef);
+    const currentUser = userSnapshot.data() as AppUser | undefined;
+
+    if (!currentUser || currentUser.isActive === false) {
+      throw new Error(i18n.t("auth:deactivated_user"));
+    }
+
+    if (Number(currentUser.poopcoinBalance ?? 0) < 1) {
+      throw new Error(i18n.t("cuiter:service.missingCredits"));
+    }
+
+    const poopcoinTransaction = await appendPoopcoinTransaction(transaction, {
+      type: "cuiter_spend",
+      entries: [{ userId: user.uid, delta: -1 }],
+      amount: 1,
+      createdBy: user.uid,
+      createdByRole: currentUser.role,
+      fromUserId: user.uid,
+      linkedPostId: postRef.id,
+      createdAt,
+    });
+    poopcoinTransactionHash = poopcoinTransaction.hash;
+
+    transaction.set(postRef, {
+      userId: user.uid,
+      userName: currentUser.nickname?.trim() || currentUser.name,
+      message: normalizedMessage,
+      createdAt,
+      poopcoinTransactionHash,
+    });
+    transaction.update(userRef, { poopcoinBalance: increment(-1) });
   });
+
   return {
-    id: docRef.id,
+    id: postRef.id,
     userId: user.uid,
     userName: user.nickname?.trim() || user.name,
     message: normalizedMessage,
     createdAt,
+    poopcoinTransactionHash,
   } as CuiterPost;
 }

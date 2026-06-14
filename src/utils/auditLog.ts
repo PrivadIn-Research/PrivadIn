@@ -99,6 +99,26 @@ export function formatAuditLogMessage(
       return t("auditMessages.updateTermsOfUse", {
         admin: adminName,
       });
+    case "adjust_poopcoins":
+      if (typeof auditLog.poopcoins === "number" && targetName) {
+        return t("auditMessages.adjustPoopcoins", {
+          admin: adminName,
+          target: targetName,
+          count: Math.abs(auditLog.poopcoins),
+          direction: auditLog.poopcoins > 0 ? "+" : "-",
+        });
+      }
+      break;
+    case "reverse_poopcoin_transaction":
+      return t("auditMessages.reversePoopcoinTransaction", {
+        admin: adminName,
+        hash: auditLog.poopcoinTransactionHash ?? "",
+      });
+    case "migrate_poopcoins":
+      return t("auditMessages.migratePoopcoins", {
+        admin: adminName,
+        count: auditLog.poopcoins ?? auditLog.delta ?? 0,
+      });
   }
 
   return auditLog.description ?? t("auditMessages.unknown");

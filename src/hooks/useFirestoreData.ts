@@ -5,6 +5,7 @@ import type {
   AppSettings,
   AppUser,
   PoopLog,
+  PoopcoinTransaction,
   RankedUser,
   RegistrationAttempt,
   RegistrationRequest,
@@ -26,6 +27,7 @@ import {
   defaultAppSettings,
   parseAppSettings,
 } from "../services/settingsService";
+import { poopcoinTransactionsQuery } from "../services/poopcoinService";
 
 function sortLogs(logs: PoopLog[]) {
   return [...logs].sort((a, b) => {
@@ -234,4 +236,29 @@ export function useAppSettings(enabled = true) {
   }, [enabled]);
 
   return { appSettings, loading };
+}
+
+export function usePoopcoinTransactions(enabled = true) {
+  const [transactions, setTransactions] = useState<PoopcoinTransaction[]>([]);
+
+  useEffect(() => {
+    if (!enabled || !isFirebaseConfigured) {
+      setTransactions([]);
+      return;
+    }
+
+    return onSnapshot(
+      poopcoinTransactionsQuery(),
+      (snapshot) => {
+        setTransactions(
+          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as PoopcoinTransaction),
+        );
+      },
+      (error) => {
+        console.error("Erro ao ler ledger de Poopcoins:", error);
+      },
+    );
+  }, [enabled]);
+
+  return transactions;
 }

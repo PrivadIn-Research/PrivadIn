@@ -1,5 +1,5 @@
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "@firebase/firestore";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { AvatarCropper } from "../components/AvatarCropper";

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { onSnapshot } from "firebase/firestore";
+import { onSnapshot } from "@firebase/firestore";
 import type {
   AdminAuditLog,
   AppSettings,

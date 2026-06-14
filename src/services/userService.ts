@@ -1,11 +1,11 @@
-import { updateProfile } from "firebase/auth";
-import { Timestamp, collection, doc, getDoc, getDocs, query, updateDoc, where, limit } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { updateProfile } from "@firebase/auth";
+import { Timestamp, collection, doc, getDoc, getDocs, query, updateDoc, where, limit } from "@firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "@firebase/storage";
 import i18n from "../i18n";
 import { auth, db, storage } from "./firebase";
 import type { AppUser } from "../types";
 import { NAME_MAX_LENGTH, NICKNAME_MAX_LENGTH, normalizeProfileIdentity, validateProfileIdentity } from "../utils/profileIdentity";
-import { writeBatch } from "firebase/firestore";
+import { writeBatch } from "@firebase/firestore";
 import { adminLogsRef, createAuditLog } from "./poopService";
 
 export const usersRef = collection(db, "users");

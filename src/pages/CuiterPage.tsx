@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Timestamp, type DocumentData, type QueryDocumentSnapshot } from "firebase/firestore";
-import { FirebaseError } from "firebase/app";
+import { Timestamp, type DocumentData, type QueryDocumentSnapshot } from "@firebase/firestore";
+import { FirebaseError } from "@firebase/app";
 import toast from "react-hot-toast";
 import { MessageCircle, Send } from "lucide-react";
 import { Trans, useTranslation } from "react-i18next";

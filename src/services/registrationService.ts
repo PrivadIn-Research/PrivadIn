@@ -8,7 +8,7 @@ import {
   query,
   setDoc,
   updateDoc,
-} from "firebase/firestore";
+} from "@firebase/firestore";
 import { db } from "./firebase";
 import type { RegistrationAttemptStatus, RegistrationRequest } from "../types";
 

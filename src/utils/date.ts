@@ -11,7 +11,7 @@ import {
   startOfWeek,
   subDays,
 } from "date-fns";
-import type { Timestamp } from "firebase/firestore";
+import type { Timestamp } from "@firebase/firestore";
 import i18n from "../i18n";
 import { getDateFnsLocale } from "../i18n/config";
 import type { PoopLog } from "../types";

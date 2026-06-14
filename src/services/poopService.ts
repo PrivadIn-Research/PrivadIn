@@ -13,7 +13,7 @@ import {
   updateDoc,
   where,
   writeBatch,
-} from "firebase/firestore";
+} from "@firebase/firestore";
 import { db } from "./firebase";
 import type { AdminAuditAction, AppUser, BonusTimeRange, PoopLocation, PoopLog } from "../types";
 import {

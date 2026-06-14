@@ -193,6 +193,44 @@ export function AdminPage({
       </Card>
 
       <Card>
+        <div className="mb-4">
+          <p className="text-sm font-bold text-accent-strong">{t("announcementEyebrow")}</p>
+          <h2 className="text-2xl font-black text-fg">{t("announcementTitle")}</h2>
+          <p className="mt-1 text-sm text-fg-muted">{t("announcementDescription")}</p>
+        </div>
+
+        <label className="block">
+          <textarea
+            className="min-h-28 w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
+            maxLength={MAX_COMPETITION_ANNOUNCEMENT_LENGTH}
+            value={announcementInput}
+            onChange={(event) => setAnnouncementInput(event.target.value)}
+            placeholder={t("announcementPlaceholder")}
+          />
+        </label>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-fg-muted">
+            {t("announcementCounter", {
+              count: normalizedAnnouncement.length,
+              max: MAX_COMPETITION_ANNOUNCEMENT_LENGTH,
+            })}
+          </p>
+          <button
+            disabled={busy || normalizedAnnouncement === (appSettings.competitionAnnouncement ?? "")}
+            onClick={() =>
+              runAdminAction(
+                () => updateCompetitionAnnouncement(admin, announcementInput),
+                t("toast.announcementSaved"),
+              )
+            }
+            className="rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg transition hover:bg-accent-strong disabled:opacity-60"
+          >
+            {t("actions.saveAnnouncement")}
+          </button>
+        </div>
+      </Card>
+
+      <Card>
         <CollapsibleSection
           eyebrow={t("settingsEyebrow")}
           title={t("settingsTitle")}
@@ -312,40 +350,6 @@ export function AdminPage({
                 Save ranges
               </button>
             </div>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <h3 className="text-sm font-bold text-fg-soft">{t("announcementTitle")}</h3>
-          <p className="mt-1 text-sm text-fg-muted">{t("announcementDescription")}</p>
-          <label className="mt-3 block">
-            <textarea
-              className="min-h-28 w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
-              maxLength={MAX_COMPETITION_ANNOUNCEMENT_LENGTH}
-              value={announcementInput}
-              onChange={(event) => setAnnouncementInput(event.target.value)}
-              placeholder={t("announcementPlaceholder")}
-            />
-          </label>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-fg-muted">
-              {t("announcementCounter", {
-                count: normalizedAnnouncement.length,
-                max: MAX_COMPETITION_ANNOUNCEMENT_LENGTH,
-              })}
-            </p>
-            <button
-              disabled={busy || normalizedAnnouncement === (appSettings.competitionAnnouncement ?? "")}
-              onClick={() =>
-                runAdminAction(
-                  () => updateCompetitionAnnouncement(admin, announcementInput),
-                  t("toast.announcementSaved"),
-                )
-              }
-              className="rounded-2xl border border-line/10 bg-panel px-5 py-3 font-black text-fg transition hover:bg-panel-strong disabled:opacity-60"
-            >
-              {t("actions.saveAnnouncement")}
-            </button>
           </div>
         </div>
 

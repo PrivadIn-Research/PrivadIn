@@ -17,10 +17,6 @@ void i18n
   });
 
 i18n.addResources("pt-BR", "dashboard", {
-  metric: {
-    weeklyPoints: "Pontos da semana",
-    weeklyPointsHint: "So voce ve sua pontuacao acumulada durante a semana",
-  },
   resolveProfileAction: "Resolver no perfil",
   resolveTermsAction: "Revisar termos",
 });
@@ -84,12 +80,16 @@ i18n.addResources("pt-BR", "login", {
 
 i18n.addResources("pt-BR", "admin", {
   actions: {
+    saveAnnouncement: "Salvar narracao",
     saveTerms: "Publicar termos",
   },
   toast: {
     termsSaved: "Termos publicados. Nova versao: {{version}}.",
   },
   termsTitle: "Termos de uso",
+  announcementEyebrow: "Comunicado global",
+  announcementTitle: "Narracao da competicao",
+  announcementDescription: "Aparece no painel principal para todos.",
   termsDescription: "Ao publicar, a versao sobe e quem entrar de novo precisara aceitar o texto atual. Versao atual: {{version}}.",
   termsPlaceholder: "Escreva os termos de uso exibidos no login...",
   termsCounter: "{{count}}/{{max}} caracteres",
@@ -102,10 +102,6 @@ i18n.addResources("pt-BR", "admin", {
 });
 
 i18n.addResources("en-US", "dashboard", {
-  metric: {
-    weeklyPoints: "Weekly points",
-    weeklyPointsHint: "Only your running score stays visible during the week",
-  },
   resolveProfileAction: "Open profile",
   resolveTermsAction: "Review terms",
 });
@@ -169,12 +165,16 @@ i18n.addResources("en-US", "login", {
 
 i18n.addResources("en-US", "admin", {
   actions: {
+    saveAnnouncement: "Save commentary",
     saveTerms: "Publish terms",
   },
   toast: {
     termsSaved: "Terms published. New version: {{version}}.",
   },
   termsTitle: "Terms of use",
+  announcementEyebrow: "Global message",
+  announcementTitle: "Competition commentary",
+  announcementDescription: "Appears on the main dashboard for every user.",
   termsDescription: "Publishing increments the version and users will need to accept the current text again on the next sign-in. Current version: {{version}}.",
   termsPlaceholder: "Write the terms of use shown on the login page...",
   termsCounter: "{{count}}/{{max}} characters",

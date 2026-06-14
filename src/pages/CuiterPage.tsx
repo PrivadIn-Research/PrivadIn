@@ -17,6 +17,7 @@ import {
 } from "../services/cuiterService";
 import type { AppUser, CuiterPost, PoopLog } from "../types";
 import { formatDateTime, formatTimeAgo, toDate } from "../utils/date";
+import { countGraphemes, sliceGraphemes } from "../utils/grapheme";
 
 export function CuiterPage({
   user,
@@ -37,7 +38,7 @@ export function CuiterPage({
   const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [userPostsCount, setUserPostsCount] = useState(0);
   const usersById = useMemo(() => new Map(users.map((candidate) => [candidate.uid, candidate])), [users]);
-  const charsCount = [...message].length;
+  const charsCount = countGraphemes(message);
   const charsRemaining = CUITER_MAX_CHARS - charsCount;
   const eligibleLogsCount = userLogs.filter((log) => {
     const createdAtMs = toDate(log.createdAt)?.getTime();
@@ -158,8 +159,7 @@ export function CuiterPage({
 
           <textarea
             value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            maxLength={CUITER_MAX_CHARS}
+            onChange={(event) => setMessage(sliceGraphemes(event.target.value, CUITER_MAX_CHARS))}
             placeholder={t("placeholder")}
             className="min-h-24 w-full resize-none rounded-2xl border border-line/15 bg-field p-3 text-sm text-fg outline-none ring-accent/20 transition placeholder:text-fg-muted focus:border-accent/35 focus:ring"
           />

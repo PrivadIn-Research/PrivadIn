@@ -295,7 +295,7 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
 
       await updateUserProfile(user.uid, updates);
 
-      if (user.avatarStoragePath && user.avatarStoragePath !== updates.avatarStoragePath) {
+      if (avatarAction !== "keep" && user.avatarStoragePath && user.avatarStoragePath !== updates.avatarStoragePath) {
         try {
           await deleteAvatarFile(user.avatarStoragePath);
         } catch (cleanupError) {
@@ -307,7 +307,7 @@ export function EditProfilePage({ user, appSettings }: { user: AppUser; appSetti
       clearPendingUpload();
       replaceCropperImageUrl(null);
       setAvatarAction("keep");
-      setAvatarStatus(updates.avatar && isValidDicebearUrl(updates.avatar) ? "valid" : "idle");
+      setAvatarStatus(isValidDicebearUrl(updates.avatar ?? user.avatar ?? "") ? "valid" : "idle");
       toast.success(t("updateSuccess"));
     } catch (error) {
       if (uploadedStoragePath) {

@@ -15,6 +15,7 @@ import {
 import { db } from "./firebase";
 import i18n from "../i18n";
 import type { AppUser, CuiterPost } from "../types";
+import { countGraphemes } from "../utils/grapheme";
 
 export const CUITER_MAX_CHARS = 80;
 export const CUITER_PAGE_SIZE = 10;
@@ -84,7 +85,7 @@ export async function createCuiterPost(
     throw new Error(i18n.t("cuiter:service.emptyMessage"));
   }
 
-  if ([...normalizedMessage].length > CUITER_MAX_CHARS) {
+  if (countGraphemes(normalizedMessage) > CUITER_MAX_CHARS) {
     throw new Error(i18n.t("cuiter:service.tooLong", { count: CUITER_MAX_CHARS }));
   }
 

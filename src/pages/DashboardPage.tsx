@@ -11,7 +11,6 @@ import { formatNumber } from "../utils/format";
 import { toRoman } from "../utils/roman";
 import { requestCurrentLocation } from "../services/locationService";
 import { registerPoopWithValidation } from "../services/poopService";
-import { registerPoopWithBackendValidation } from "../services/secureFunctionsService";
 import { createWeeklyRankingShareFile, RANKING_LIMIT } from "../utils/weeklyRankingShare";
 
 

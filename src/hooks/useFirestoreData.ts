@@ -5,6 +5,7 @@ import type {
   AppSettings,
   AppUser,
   PoopLog,
+  PoopcoinSupplySummary,
   PoopcoinTransaction,
   RankedUser,
   RegistrationAttempt,
@@ -27,7 +28,11 @@ import {
   defaultAppSettings,
   parseAppSettings,
 } from "../services/settingsService";
-import { poopcoinTransactionsQuery } from "../services/poopcoinService";
+import {
+  parsePoopcoinSupplySummary,
+  poopcoinChainHeadRef,
+  poopcoinTransactionsQuery,
+} from "../services/poopcoinService";
 
 function sortLogs(logs: PoopLog[]) {
   return [...logs].sort((a, b) => {
@@ -261,4 +266,28 @@ export function usePoopcoinTransactions(enabled = true) {
   }, [enabled]);
 
   return transactions;
+}
+
+export function usePoopcoinSupply(enabled = true) {
+  const [supply, setSupply] = useState<PoopcoinSupplySummary>(() => parsePoopcoinSupplySummary());
+
+  useEffect(() => {
+    if (!enabled || !isFirebaseConfigured) {
+      setSupply(parsePoopcoinSupplySummary());
+      return;
+    }
+
+    return onSnapshot(
+      poopcoinChainHeadRef,
+      (snapshot) => {
+        setSupply(parsePoopcoinSupplySummary(snapshot.data() as Record<string, unknown> | undefined));
+      },
+      (error) => {
+        console.error("Erro ao ler suprimento de Poopcoins:", error);
+        setSupply(parsePoopcoinSupplySummary());
+      },
+    );
+  }, [enabled]);
+
+  return supply;
 }

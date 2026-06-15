@@ -57,6 +57,7 @@ export interface PoopLog {
   userName: string;
   createdAt: Timestamp;
   points: number;
+  poopcoinsEarned?: number;
   isWeeklyActive: boolean;
   location?: PoopLocation;
   timezone?: string;
@@ -113,9 +114,20 @@ export interface PoopcoinTransaction {
   nonce: string;
 }
 
+export interface PoopcoinSupplySummary {
+  totalSupply: number;
+  mintedSupply: number;
+  burnedSupply: number;
+  circulatingSupply: number;
+  availableSupply: number;
+  supplyMigratedAt?: Timestamp | null;
+}
+
 export interface AppSettings {
   cooldownMinutes: number;
   pointsPerLog: number;
+  poopcoinsPerLog: number;
+  cuiterPostCost: number;
   edition: number;
   overallRankingVisible?: boolean;
   termsOfUseText?: string;
@@ -125,6 +137,8 @@ export interface AppSettings {
   competitionAnnouncement?: string;
   competitionAnnouncementUpdatedAt?: Timestamp;
   competitionAnnouncementUpdatedBy?: string;
+  poopcoinsPerLogUpdatedAt?: Timestamp;
+  poopcoinsPerLogUpdatedBy?: string;
   updatedAt?: Timestamp;
   updatedBy?: string;
 }
@@ -150,9 +164,11 @@ export type AdminAuditAction =
   | "deactivate_user"
   | "reactivate_user"
   | "update_competition_announcement"
+  | "update_poopcoin_rules"
   | "adjust_poopcoins"
   | "reverse_poopcoin_transaction"
-  | "migrate_poopcoins";
+  | "migrate_poopcoins"
+  | "recalculate_poopcoin_supply";
 
 export interface AdminAuditLog {
   id: string;
@@ -168,6 +184,8 @@ export interface AdminAuditLog {
   removedLogId?: string | null;
   cooldownMinutes?: number | null;
   pointsPerLog?: number | null;
+  poopcoinsPerLog?: number | null;
+  cuiterPostCost?: number | null;
   edition?: number | null;
   poopcoins?: number | null;
   poopcoinTransactionHash?: string | null;

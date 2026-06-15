@@ -75,6 +75,12 @@ export function formatAuditLogMessage(
         });
       }
       break;
+    case "update_poopcoin_rules":
+      return t("auditMessages.updatePoopcoinRules", {
+        admin: adminName,
+        poopcoins: auditLog.poopcoinsPerLog ?? 0,
+        cost: auditLog.cuiterPostCost ?? 0,
+      });
     case "deactivate_user":
       if (targetName) {
         return t("auditMessages.deactivateUser", {
@@ -116,6 +122,11 @@ export function formatAuditLogMessage(
       });
     case "migrate_poopcoins":
       return t("auditMessages.migratePoopcoins", {
+        admin: adminName,
+        count: auditLog.poopcoins ?? auditLog.delta ?? 0,
+      });
+    case "recalculate_poopcoin_supply":
+      return t("auditMessages.recalculatePoopcoinSupply", {
         admin: adminName,
         count: auditLog.poopcoins ?? auditLog.delta ?? 0,
       });

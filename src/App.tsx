@@ -6,6 +6,7 @@ import {
   useAdminAuditLogs,
   useAllLogs,
   useAppSettings,
+  usePoopcoinSupply,
   usePoopcoinTransactions,
   useRegistrationAttempts,
   useRegistrationRequests,
@@ -40,6 +41,7 @@ function AppContent() {
   );
   const allLogs = useAllLogs(view === "stats" || view === "admin");
   const poopcoinTransactions = usePoopcoinTransactions(Boolean(user) && (view === "poopcoins" || view === "admin"));
+  const poopcoinSupply = usePoopcoinSupply(Boolean(user) && (view === "poopcoins" || view === "admin"));
   const { muted, toggleMuted, playFlush } = useSound();
 
   const liveUser = useMemo(() => {
@@ -105,9 +107,10 @@ function AppContent() {
           userLogs={userLogs}
           cooldownMinutes={appSettings.cooldownMinutes}
           pointsPerLog={appSettings.pointsPerLog}
+          poopcoinsPerLog={appSettings.poopcoinsPerLog}
+          poopcoinsPerLogUpdatedAt={appSettings.poopcoinsPerLogUpdatedAt}
           edition={appSettings.edition}
           competitionAnnouncement={appSettings.competitionAnnouncement ?? ""}
-          overallRankingVisible={appSettings.overallRankingVisible === true}
           onPlaySound={playFlush}
           onOpenProfile={() => handleViewProfile(liveUser.uid)}
           onViewProfile={handleViewProfile}
@@ -124,10 +127,25 @@ function AppContent() {
       {view === "edit-profile" ? (
         <EditProfilePage user={liveUser} appSettings={appSettings} setView={setView} />
       ) : null}
-      {view === "poopcoins" ? <PoopcoinsPage user={liveUser} users={users} transactions={poopcoinTransactions} /> : null}
+      {view === "poopcoins" ? (
+        <PoopcoinsPage
+          user={liveUser}
+          users={users}
+          transactions={poopcoinTransactions}
+          appSettings={appSettings}
+          supply={poopcoinSupply}
+        />
+      ) : null}
       {view === "history" ? <HistoryPage logs={userLogs} /> : null}
       {view === "stats" ? <StatsPage user={liveUser} logs={userLogs} allLogs={allLogs} rankedUsers={rankedUsers} overallRankingVisible={appSettings.overallRankingVisible === true} /> : null}
-      {view === "cuiter" ? <CuiterPage user={liveUser} users={users} onViewProfile={handleViewProfile} /> : null}
+      {view === "cuiter" ? (
+        <CuiterPage
+          user={liveUser}
+          users={users}
+          cuiterPostCost={appSettings.cuiterPostCost}
+          onViewProfile={handleViewProfile}
+        />
+      ) : null}
       {view === "admin" && liveUser.role === "admin" ? (
         <AdminPage
           admin={liveUser}
@@ -138,6 +156,7 @@ function AppContent() {
           registrationRequests={registrationRequests}
           registrationAttempts={registrationAttempts}
           poopcoinTransactions={poopcoinTransactions}
+          poopcoinSupply={poopcoinSupply}
         />
       ) : null}
     </Shell>

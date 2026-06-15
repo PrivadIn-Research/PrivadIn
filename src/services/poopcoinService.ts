@@ -16,6 +16,7 @@ import { adminLogsRef, createAuditLog } from "./poopService";
 import type {
   AppUser,
   PoopLog,
+  PoopcoinSupplySummary,
   PoopcoinTransaction,
   PoopcoinTransactionEntry,
   PoopcoinTransactionType,
@@ -24,6 +25,7 @@ import type {
 
 export const poopcoinTransactionsRef = collection(db, "poopcoin_transactions");
 export const poopcoinChainHeadRef = doc(db, "poopcoin_chain", "head");
+export const POOPCOIN_TOTAL_SUPPLY = 1_000_000;
 export const POOPCOIN_LEDGER_PAGE_SIZE = 50;
 export const POOPCOIN_MIGRATION_BATCH_SIZE = 25;
 
@@ -44,6 +46,14 @@ type AppendPoopcoinInput = {
   linkedPostId?: string | null;
   reversesTransactionHash?: string | null;
   reason?: string | null;
+  supplyEffect?: PoopcoinSupplyEffect;
+};
+
+type PoopcoinSupplyEffect = {
+  mintedDelta?: number;
+  burnedDelta?: number;
+  circulatingDelta?: number;
+  requireMigratedSupply?: boolean;
 };
 
 export function poopcoinTransactionsQuery(pageSize = POOPCOIN_LEDGER_PAGE_SIZE) {
@@ -64,6 +74,76 @@ export function formatPoopcoins(value?: number | null) {
   return new Intl.NumberFormat("pt-BR", {
     maximumFractionDigits: 0,
   }).format(Number.isFinite(amount) ? amount : 0);
+}
+
+function normalizeSupplyAmount(value: unknown, fallback = 0) {
+  const amount = Number(value ?? fallback);
+  if (!Number.isFinite(amount)) return fallback;
+  return Math.max(0, Math.trunc(amount));
+}
+
+export function parsePoopcoinSupplySummary(data?: Record<string, unknown> | null): PoopcoinSupplySummary {
+  const totalSupply = normalizeSupplyAmount(data?.totalSupply, POOPCOIN_TOTAL_SUPPLY) || POOPCOIN_TOTAL_SUPPLY;
+  const mintedSupply = Math.min(totalSupply, normalizeSupplyAmount(data?.mintedSupply));
+  const burnedSupply = normalizeSupplyAmount(data?.burnedSupply);
+  const circulatingSupply = normalizeSupplyAmount(data?.circulatingSupply);
+  const isMigrated = Boolean(data?.supplyMigratedAt);
+
+  return {
+    totalSupply,
+    mintedSupply,
+    burnedSupply,
+    circulatingSupply,
+    availableSupply: isMigrated ? Math.max(0, totalSupply - mintedSupply) : 0,
+    supplyMigratedAt: (data?.supplyMigratedAt as Timestamp | undefined) ?? null,
+  };
+}
+
+export function resolveMintablePoopcoins(
+  headData: Record<string, unknown> | undefined,
+  amountValue: number,
+) {
+  const amount = normalizePoopcoinAmount(amountValue);
+  if (!headData?.supplyMigratedAt || amount <= 0) return 0;
+
+  const summary = parsePoopcoinSupplySummary(headData);
+  return summary.availableSupply >= amount ? amount : 0;
+}
+
+function resolveSupplyHeadUpdate(
+  headData: Record<string, unknown> | undefined,
+  effect?: PoopcoinSupplyEffect,
+) {
+  if (!effect) return {};
+
+  const hasMigratedSupply = Boolean(headData?.supplyMigratedAt);
+  if (!hasMigratedSupply) {
+    if (effect.requireMigratedSupply) {
+      throw new Error("Recalcule o suprimento de PoopCoins antes de emitir novas moedas.");
+    }
+    return {};
+  }
+
+  const summary = parsePoopcoinSupplySummary(headData);
+  const mintedSupply = summary.mintedSupply + Math.trunc(effect.mintedDelta ?? 0);
+  const burnedSupply = summary.burnedSupply + Math.trunc(effect.burnedDelta ?? 0);
+  const circulatingSupply = summary.circulatingSupply + Math.trunc(effect.circulatingDelta ?? 0);
+
+  if (
+    mintedSupply < 0 ||
+    mintedSupply > summary.totalSupply ||
+    burnedSupply < 0 ||
+    circulatingSupply < 0
+  ) {
+    throw new Error("Suprimento de PoopCoins insuficiente para esta operacao.");
+  }
+
+  return {
+    totalSupply: summary.totalSupply,
+    mintedSupply,
+    burnedSupply,
+    circulatingSupply,
+  };
 }
 
 function canonicalize(value: unknown): unknown {
@@ -117,6 +197,44 @@ function assertValidEntries(entries: PoopcoinTransactionEntry[]) {
       throw new Error("Lancamento de Poopcoins invalido.");
     }
   });
+}
+
+function entriesDelta(entries: PoopcoinTransactionEntry[]) {
+  return entries.reduce((sum, entry) => sum + entry.delta, 0);
+}
+
+function reversalSupplyEffect(original: Omit<PoopcoinTransaction, "id">): PoopcoinSupplyEffect | undefined {
+  if (original.type === "mint_log" || original.type === "legacy_mint") {
+    return {
+      mintedDelta: -original.amount,
+      circulatingDelta: -original.amount,
+    };
+  }
+
+  if (original.type === "cuiter_spend") {
+    return {
+      burnedDelta: -original.amount,
+      circulatingDelta: original.amount,
+    };
+  }
+
+  if (original.type === "admin_adjustment") {
+    const delta = entriesDelta(original.entries);
+    if (delta > 0) {
+      return {
+        mintedDelta: -delta,
+        circulatingDelta: -delta,
+      };
+    }
+    if (delta < 0) {
+      return {
+        burnedDelta: delta,
+        circulatingDelta: -delta,
+      };
+    }
+  }
+
+  return undefined;
 }
 
 export async function appendPoopcoinTransaction(
@@ -183,6 +301,10 @@ export async function appendPoopcoinTransaction(
       lastHash: hash,
       lastSequence: sequence,
       updatedAt: createdAt,
+      ...resolveSupplyHeadUpdate(
+        headSnapshot.data() as Record<string, unknown> | undefined,
+        input.supplyEffect,
+      ),
     },
     { merge: true },
   );
@@ -264,6 +386,10 @@ export async function adjustPoopcoins(
     throw new Error("Informe um ajuste inteiro diferente de zero.");
   }
 
+  if (Math.abs(amount) > MAX_TRANSFER_AMOUNT) {
+    throw new Error(`Informe um ajuste de ate ${formatPoopcoins(MAX_TRANSFER_AMOUNT)} Poopcoins.`);
+  }
+
   if (!reason) {
     throw new Error("Informe o motivo do ajuste.");
   }
@@ -285,6 +411,17 @@ export async function adjustPoopcoins(
       toUserId: amount > 0 ? targetUser.uid : null,
       fromUserId: amount < 0 ? targetUser.uid : null,
       reason,
+      supplyEffect:
+        amount > 0
+          ? {
+              mintedDelta: amount,
+              circulatingDelta: amount,
+              requireMigratedSupply: true,
+            }
+          : {
+              burnedDelta: Math.abs(amount),
+              circulatingDelta: amount,
+            },
     });
 
     transaction.update(targetRef, { poopcoinBalance: increment(amount) });
@@ -352,6 +489,7 @@ export async function reversePoopcoinTransaction(
       linkedLogId: original.linkedLogId ?? null,
       linkedPostId: original.linkedPostId ?? null,
       reason,
+      supplyEffect: reversalSupplyEffect(original),
     });
 
     inverseEntries.forEach((entry) => {
@@ -407,9 +545,14 @@ export async function migratePoopcoinsForLogs(admin: AppUser, logs: PoopLog[]) {
         linkedLogId: log.id,
         createdAt: latestLog.createdAt ?? Timestamp.now(),
         reason: "Migracao inicial de logs antigos.",
+        supplyEffect: {
+          mintedDelta: 1,
+          circulatingDelta: 1,
+          requireMigratedSupply: true,
+        },
       });
 
-      transaction.update(logRef, { poopcoinTransactionHash: hash });
+      transaction.update(logRef, { poopcoinTransactionHash: hash, poopcoinsEarned: 1 });
       transaction.update(userRef, {
         poopcoinBalance: increment(1),
         poopcoinMigratedAt: Timestamp.now(),
@@ -433,6 +576,59 @@ export async function migratePoopcoinsForLogs(admin: AppUser, logs: PoopLog[]) {
   }
 
   return migrated;
+}
+
+export async function recalculatePoopcoinSupply(admin: AppUser) {
+  const [usersSnapshot, latestTransactionSnapshot] = await Promise.all([
+    getDocs(collection(db, "users")),
+    getDocs(poopcoinTransactionsQuery(1)),
+  ]);
+  const latestTransaction = latestTransactionSnapshot.docs[0]?.data() as PoopcoinTransaction | undefined;
+  const walletSupply = usersSnapshot.docs.reduce((sum, userDoc) => {
+    const userData = userDoc.data() as Pick<AppUser, "poopcoinBalance">;
+    return sum + normalizeSupplyAmount(userData.poopcoinBalance);
+  }, 0);
+  const now = Timestamp.now();
+  const circulatingSupply = Math.min(POOPCOIN_TOTAL_SUPPLY, walletSupply);
+  const normalizedSummary = {
+    totalSupply: POOPCOIN_TOTAL_SUPPLY,
+    mintedSupply: circulatingSupply,
+    burnedSupply: 0,
+    circulatingSupply,
+    supplyMigratedAt: now,
+    updatedAt: now,
+  };
+
+  await runTransaction(db, async (transaction) => {
+    const headSnapshot = await transaction.get(poopcoinChainHeadRef);
+    const headData = headSnapshot.data();
+    const headSequence = Math.max(0, Math.trunc(Number(headData?.lastSequence ?? 0)));
+    const latestSequence = Math.max(0, Math.trunc(Number(latestTransaction?.sequence ?? 0)));
+    const lastHash =
+      latestTransaction && latestSequence > headSequence
+        ? latestTransaction.hash
+        : String(headData?.lastHash ?? latestTransaction?.hash ?? GENESIS_HASH);
+    transaction.set(
+      poopcoinChainHeadRef,
+      {
+        ...normalizedSummary,
+        lastHash,
+        lastSequence: Math.max(headSequence, latestSequence),
+      },
+      { merge: true },
+    );
+    transaction.set(
+      doc(adminLogsRef),
+      createAuditLog({
+        action: "recalculate_poopcoin_supply",
+        admin,
+        delta: normalizedSummary.mintedSupply,
+        poopcoins: normalizedSummary.mintedSupply,
+      }),
+    );
+  });
+
+  return parsePoopcoinSupplySummary(normalizedSummary);
 }
 
 export async function fetchRecentPoopcoinTransactions(limitCount = POOPCOIN_LEDGER_PAGE_SIZE) {

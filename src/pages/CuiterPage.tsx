@@ -15,14 +15,17 @@ import {
 import type { AppUser, CuiterPost } from "../types";
 import { formatTimeAgo } from "../utils/date";
 import { countGraphemes, sliceGraphemes } from "../utils/grapheme";
+import { formatPoopcoins } from "../services/poopcoinService";
 
 export function CuiterPage({
   user,
   users,
+  cuiterPostCost,
   onViewProfile,
 }: {
   user: AppUser;
   users: AppUser[];
+  cuiterPostCost: number;
   onViewProfile: (userId: string) => void;
 }) {
   const { t } = useTranslation("cuiter");
@@ -37,7 +40,7 @@ export function CuiterPage({
   const charsCount = countGraphemes(message);
   const charsRemaining = CUITER_MAX_CHARS - charsCount;
   const availableCredits = getCuiterAvailableCredits(user);
-  const unlocked = canPostOnCuiter(user);
+  const unlocked = canPostOnCuiter(user, cuiterPostCost);
   const canPublish = unlocked && !sending && charsCount > 0 && charsCount <= CUITER_MAX_CHARS;
 
   function isFirestorePermissionDenied(error: unknown): error is FirebaseError {
@@ -129,6 +132,9 @@ export function CuiterPage({
               {t("unlockInfo")}
             </div>
           ) : null}
+          <div className="rounded-2xl border border-line/10 bg-panel-strong/40 p-3 text-sm font-semibold text-fg-soft">
+            Custo por post: {formatPoopcoins(cuiterPostCost)} PC
+          </div>
 
           <textarea
             value={message}

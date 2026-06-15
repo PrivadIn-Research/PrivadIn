@@ -9,6 +9,7 @@ import type {
   AppSettings,
   AppUser,
   PoopLog,
+  PoopcoinSupplySummary,
   PoopcoinTransaction,
   RegistrationAttempt,
   RegistrationRequest,
@@ -18,10 +19,12 @@ import {
   MAX_COMPETITION_ANNOUNCEMENT_LENGTH,
   MAX_TERMS_OF_USE_LENGTH,
   normalizeCompetitionAnnouncement,
+  normalizePoopcoinRuleValue,
   normalizeTermsOfUseText,
   updateBonusTimeRanges,
   updateCompetitionAnnouncement,
   updateCooldownMinutes,
+  updatePoopcoinRules,
   updatePointsPerLog,
   updateTermsOfUse,
 } from "../services/settingsService";
@@ -38,6 +41,7 @@ import {
   adjustPoopcoins,
   formatPoopcoins,
   migratePoopcoinsForLogs,
+  recalculatePoopcoinSupply,
   reversePoopcoinTransaction,
 } from "../services/poopcoinService";
 
@@ -94,6 +98,7 @@ export function AdminPage({
   registrationRequests,
   registrationAttempts,
   poopcoinTransactions,
+  poopcoinSupply,
 }: {
   admin: AppUser;
   users: AppUser[];
@@ -103,11 +108,14 @@ export function AdminPage({
   registrationRequests: RegistrationRequest[];
   registrationAttempts: RegistrationAttempt[];
   poopcoinTransactions: PoopcoinTransaction[];
+  poopcoinSupply: PoopcoinSupplySummary;
 }) {
   const { t } = useTranslation("admin");
   const [busy, setBusy] = useState(false);
   const [cooldownInput, setCooldownInput] = useState(String(appSettings.cooldownMinutes));
   const [pointsInput, setPointsInput] = useState(String(appSettings.pointsPerLog));
+  const [poopcoinsPerLogInput, setPoopcoinsPerLogInput] = useState(String(appSettings.poopcoinsPerLog));
+  const [cuiterPostCostInput, setCuiterPostCostInput] = useState(String(appSettings.cuiterPostCost));
   const [bonusRanges, setBonusRanges] = useState<{ start: string; end: string; points: number }[]>(
     (appSettings as any).bonusTimeRanges ?? [],
   );
@@ -127,6 +135,14 @@ export function AdminPage({
   }, [appSettings.pointsPerLog]);
 
   useEffect(() => {
+    setPoopcoinsPerLogInput(String(appSettings.poopcoinsPerLog));
+  }, [appSettings.poopcoinsPerLog]);
+
+  useEffect(() => {
+    setCuiterPostCostInput(String(appSettings.cuiterPostCost));
+  }, [appSettings.cuiterPostCost]);
+
+  useEffect(() => {
     setAnnouncementInput(appSettings.competitionAnnouncement ?? "");
   }, [appSettings.competitionAnnouncement]);
 
@@ -140,6 +156,17 @@ export function AdminPage({
   const parsedPoints = Number(pointsInput);
   const isPointsValid =
     Number.isInteger(parsedPoints) && parsedPoints >= 1 && parsedPoints <= 100000;
+  const parsedPoopcoinsPerLog = Number(poopcoinsPerLogInput);
+  const parsedCuiterPostCost = Number(cuiterPostCostInput);
+  const isPoopcoinsPerLogValid =
+    Number.isInteger(parsedPoopcoinsPerLog) && parsedPoopcoinsPerLog >= 1 && parsedPoopcoinsPerLog <= 100000;
+  const isCuiterPostCostValid =
+    Number.isInteger(parsedCuiterPostCost) && parsedCuiterPostCost >= 1 && parsedCuiterPostCost <= 100000;
+  const normalizedPoopcoinsPerLog = normalizePoopcoinRuleValue(parsedPoopcoinsPerLog, appSettings.poopcoinsPerLog);
+  const normalizedCuiterPostCost = normalizePoopcoinRuleValue(parsedCuiterPostCost, appSettings.cuiterPostCost);
+  const hasPoopcoinRuleChanges =
+    normalizedPoopcoinsPerLog !== appSettings.poopcoinsPerLog ||
+    normalizedCuiterPostCost !== appSettings.cuiterPostCost;
   const normalizedAnnouncement = normalizeCompetitionAnnouncement(announcementInput);
   const normalizedTerms = normalizeTermsOfUseText(termsInput);
   const usersById = useMemo(() => buildUsersById(users), [users]);
@@ -149,8 +176,8 @@ export function AdminPage({
     try {
       await action();
       toast.success(success);
-    } catch {
-      toast.error(t("toast.genericError"));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("toast.genericError"));
     } finally {
       setBusy(false);
     }
@@ -214,9 +241,23 @@ export function AdminPage({
     setReverseReason("");
   }
 
+  async function savePoopcoinRules() {
+    await runAdminAction(
+      () => updatePoopcoinRules(admin, parsedPoopcoinsPerLog, parsedCuiterPostCost),
+      "Regras PoopCoin salvas.",
+    );
+  }
+
+  async function runPoopcoinSupplyRecalculation() {
+    await runAdminAction(
+      () => recalculatePoopcoinSupply(admin).then(() => undefined),
+      "Suprimento PoopCoin recalculado.",
+    );
+  }
+
   return (
-    <div className="space-y-5">
-      <Card>
+    <div className="flex flex-col gap-5">
+      <Card className="order-10">
         <CollapsibleSection
           eyebrow={t("heroEyebrow")}
           title={t("heroTitle")}
@@ -237,7 +278,7 @@ export function AdminPage({
         </CollapsibleSection>
       </Card>
 
-      <Card>
+      <Card className="order-20">
         <div className="mb-4">
           <p className="text-sm font-bold text-accent-strong">{t("announcementEyebrow")}</p>
           <h2 className="text-2xl font-black text-fg">{t("announcementTitle")}</h2>
@@ -275,7 +316,7 @@ export function AdminPage({
         </div>
       </Card>
 
-      <Card>
+      <Card className="order-30">
         <CollapsibleSection
           eyebrow={t("settingsEyebrow")}
           title={t("settingsTitle")}
@@ -436,7 +477,7 @@ export function AdminPage({
         </CollapsibleSection>
       </Card>
 
-      <Card>
+      <Card className="order-60">
         <CollapsibleSection
           eyebrow={t("requestsEyebrow")}
           title={t("requestsTitle")}
@@ -475,7 +516,7 @@ export function AdminPage({
         </CollapsibleSection>
       </Card>
 
-      <Card>
+      <Card className="order-70">
         <CollapsibleSection
           eyebrow={t("attemptsEyebrow")}
           title={t("attemptsTitle")}
@@ -525,8 +566,8 @@ export function AdminPage({
         </CollapsibleSection>
       </Card>
 
-      <section className="grid gap-5 xl:grid-cols-2">
-        <Card>
+      <section className="contents">
+        <Card className="order-50">
           <CollapsibleSection
             eyebrow={t("manualEyebrow")}
             title={t("manualTitle")}
@@ -642,7 +683,7 @@ export function AdminPage({
           </CollapsibleSection>
         </Card>
 
-        <Card>
+        <Card className="order-80">
           <CollapsibleSection
             eyebrow={t("recentLogsEyebrow")}
             title={t("recentLogsTitle")}
@@ -671,13 +712,88 @@ export function AdminPage({
         </Card>
       </section>
 
-      <Card>
+      <Card className="order-40">
         <CollapsibleSection
           eyebrow="Poopcoins"
-          title="Ledger e reversoes"
-          description="Migre logs antigos, reverta transacoes por fraude comprovada e consulte os hashes recentes."
+          title="PoopCoins e Cuiter"
+          description="Controle emissao limitada, custo do Cuiter, reversoes e auditoria do ledger."
         >
-          <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-line/10 bg-panel-strong/40 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-fg-muted">Oferta total</p>
+              <p className="mt-2 text-2xl font-black text-fg">{formatPoopcoins(poopcoinSupply.totalSupply)} PC</p>
+            </div>
+            <div className="rounded-2xl border border-line/10 bg-panel-strong/40 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-fg-muted">Emitidas</p>
+              <p className="mt-2 text-2xl font-black text-fg">{formatPoopcoins(poopcoinSupply.mintedSupply)} PC</p>
+            </div>
+            <div className="rounded-2xl border border-line/10 bg-panel-strong/40 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-fg-muted">Queimadas</p>
+              <p className="mt-2 text-2xl font-black text-fg">{formatPoopcoins(poopcoinSupply.burnedSupply)} PC</p>
+            </div>
+            <div className="rounded-2xl border border-line/10 bg-panel-strong/40 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-fg-muted">Disponiveis</p>
+              <p className="mt-2 text-2xl font-black text-fg">{formatPoopcoins(poopcoinSupply.availableSupply)} PC</p>
+              <p className="mt-1 text-xs text-fg-muted">
+                {poopcoinSupply.supplyMigratedAt ? "Pronto para emitir" : "Recalculo pendente"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+            <label>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">PoopCoins por registro</span>
+              <input
+                className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
+                type="number"
+                min={1}
+                max={100000}
+                step={1}
+                value={poopcoinsPerLogInput}
+                onChange={(event) => setPoopcoinsPerLogInput(event.target.value)}
+              />
+              {!isPoopcoinsPerLogValid ? (
+                <p className="mt-1 text-xs font-semibold text-danger">Informe um inteiro entre 1 e 100000.</p>
+              ) : null}
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-bold text-fg-soft">Custo do post no Cuiter</span>
+              <input
+                className="w-full rounded-2xl border border-line/10 bg-field px-4 py-3 text-fg outline-none"
+                type="number"
+                min={1}
+                max={100000}
+                step={1}
+                value={cuiterPostCostInput}
+                onChange={(event) => setCuiterPostCostInput(event.target.value)}
+              />
+              {!isCuiterPostCostValid ? (
+                <p className="mt-1 text-xs font-semibold text-danger">Informe um inteiro entre 1 e 100000.</p>
+              ) : null}
+            </label>
+            <button
+              disabled={busy || !isPoopcoinsPerLogValid || !isCuiterPostCostValid || !hasPoopcoinRuleChanges}
+              onClick={() => void savePoopcoinRules()}
+              className="rounded-2xl bg-accent px-5 py-3 font-black text-accent-fg transition hover:bg-accent-strong disabled:opacity-60"
+            >
+              Salvar regras
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              disabled={busy}
+              onClick={() => void runPoopcoinSupplyRecalculation()}
+              className="rounded-2xl border border-line/10 bg-panel px-5 py-3 font-black text-fg transition hover:bg-panel-strong disabled:opacity-60"
+            >
+              Recalcular suprimento
+            </button>
+            <p className="text-sm text-fg-muted">
+              Inicializa ou corrige os totais a partir do saldo atual das carteiras.
+            </p>
+          </div>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
             <label>
               <span className="mb-2 block text-sm font-bold text-fg-soft">Hash para reverter</span>
               <input
@@ -761,7 +877,7 @@ export function AdminPage({
         </CollapsibleSection>
       </Card>
 
-      <Card>
+      <Card className="order-90">
         <CollapsibleSection
           eyebrow={t("auditEyebrow")}
           title={t("auditTitle")}

@@ -18,7 +18,15 @@ import { db } from "./firebase";
 import i18n from "../i18n";
 import type { AppUser, CuiterPost } from "../types";
 import { countGraphemes } from "../utils/grapheme";
-import { appendPoopcoinTransaction } from "./poopcoinService";
+import {
+  appendPoopcoinTransaction,
+  formatPoopcoins,
+} from "./poopcoinService";
+import {
+  DEFAULT_CUITER_POST_COST,
+  appSettingsDocRef,
+  normalizePoopcoinRuleValue,
+} from "./settingsService";
 
 export const CUITER_MAX_CHARS = 80;
 export const CUITER_PAGE_SIZE = 10;
@@ -64,8 +72,8 @@ export function getCuiterAvailableCredits(user: AppUser) {
   return Math.max(0, Math.trunc(Number(user.poopcoinBalance ?? 0)));
 }
 
-export function canPostOnCuiter(user: AppUser) {
-  return getCuiterAvailableCredits(user) > 0;
+export function canPostOnCuiter(user: AppUser, cuiterPostCost = DEFAULT_CUITER_POST_COST) {
+  return getCuiterAvailableCredits(user) >= cuiterPostCost;
 }
 
 export async function createCuiterPost(user: AppUser, message: string) {
@@ -84,26 +92,41 @@ export async function createCuiterPost(user: AppUser, message: string) {
 
   await runTransaction(db, async (transaction) => {
     const userRef = doc(db, "users", user.uid);
-    const userSnapshot = await transaction.get(userRef);
+    const [userSnapshot, settingsSnapshot] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(appSettingsDocRef),
+    ]);
     const currentUser = userSnapshot.data() as AppUser | undefined;
+    const cuiterPostCost = normalizePoopcoinRuleValue(
+      Number(settingsSnapshot.data()?.cuiterPostCost ?? DEFAULT_CUITER_POST_COST),
+      DEFAULT_CUITER_POST_COST,
+    );
 
     if (!currentUser || currentUser.isActive === false) {
       throw new Error(i18n.t("auth:deactivated_user"));
     }
 
-    if (Number(currentUser.poopcoinBalance ?? 0) < 1) {
-      throw new Error(i18n.t("cuiter:service.missingCredits"));
+    if (Number(currentUser.poopcoinBalance ?? 0) < cuiterPostCost) {
+      throw new Error(
+        i18n.t("cuiter:service.missingCredits", {
+          cost: formatPoopcoins(cuiterPostCost),
+        }),
+      );
     }
 
     const poopcoinTransaction = await appendPoopcoinTransaction(transaction, {
       type: "cuiter_spend",
-      entries: [{ userId: user.uid, delta: -1 }],
-      amount: 1,
+      entries: [{ userId: user.uid, delta: -cuiterPostCost }],
+      amount: cuiterPostCost,
       createdBy: user.uid,
       createdByRole: currentUser.role,
       fromUserId: user.uid,
       linkedPostId: postRef.id,
       createdAt,
+      supplyEffect: {
+        burnedDelta: cuiterPostCost,
+        circulatingDelta: -cuiterPostCost,
+      },
     });
     poopcoinTransactionHash = poopcoinTransaction.hash;
 
@@ -114,7 +137,7 @@ export async function createCuiterPost(user: AppUser, message: string) {
       createdAt,
       poopcoinTransactionHash,
     });
-    transaction.update(userRef, { poopcoinBalance: increment(-1) });
+    transaction.update(userRef, { poopcoinBalance: increment(-cuiterPostCost) });
   });
 
   return {

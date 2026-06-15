@@ -830,7 +830,8 @@ export function AdminPage({
               Migrar ate 25 logs antigos
             </button>
             <p className="text-sm text-fg-muted">
-              Pendentes neste carregamento: {logs.filter((log) => !log.poopcoinTransactionHash).length}
+              Regra atual: {formatPoopcoins(appSettings.poopcoinsPerLog)} PC por log antigo. Pendentes neste
+              carregamento: {logs.filter((log) => !log.poopcoinTransactionHash && log.poopcoinsEarned == null).length}
             </p>
           </div>
 

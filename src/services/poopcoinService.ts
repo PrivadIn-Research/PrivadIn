@@ -2,6 +2,7 @@ import {
   Timestamp,
   collection,
   doc,
+  getDoc,
   getDocs,
   increment,
   limit,
@@ -32,6 +33,8 @@ export const POOPCOIN_MIGRATION_BATCH_SIZE = 25;
 const GENESIS_HASH = "0".repeat(64);
 const MAX_TRANSFER_AMOUNT = 100000;
 const MAX_REASON_LENGTH = 240;
+const APP_SETTINGS_DOC_ID = "global";
+const DEFAULT_POOPCOINS_PER_LOG = 1;
 
 type AppendPoopcoinInput = {
   type: PoopcoinTransactionType;
@@ -80,6 +83,17 @@ function normalizeSupplyAmount(value: unknown, fallback = 0) {
   const amount = Number(value ?? fallback);
   if (!Number.isFinite(amount)) return fallback;
   return Math.max(0, Math.trunc(amount));
+}
+
+function normalizePoopcoinsPerLogSetting(value: unknown) {
+  const amount = Number(value ?? DEFAULT_POOPCOINS_PER_LOG);
+  if (!Number.isFinite(amount)) return DEFAULT_POOPCOINS_PER_LOG;
+  return Math.max(1, Math.min(MAX_TRANSFER_AMOUNT, Math.trunc(amount)));
+}
+
+async function fetchPoopcoinsPerLogSetting() {
+  const settingsSnapshot = await getDoc(doc(db, "app_settings", APP_SETTINGS_DOC_ID));
+  return normalizePoopcoinsPerLogSetting(settingsSnapshot.data()?.poopcoinsPerLog);
 }
 
 export function parsePoopcoinSupplySummary(data?: Record<string, unknown> | null): PoopcoinSupplySummary {
@@ -515,67 +529,89 @@ export async function reversePoopcoinTransaction(
 }
 
 export async function migratePoopcoinsForLogs(admin: AppUser, logs: PoopLog[]) {
+  const poopcoinsPerLog = await fetchPoopcoinsPerLogSetting();
   const pendingLogs = logs
-    .filter((log) => !log.poopcoinTransactionHash && log.userId)
+    .filter((log) => !log.poopcoinTransactionHash && log.poopcoinsEarned == null && log.userId)
     .slice(0, POOPCOIN_MIGRATION_BATCH_SIZE);
-  let migrated = 0;
+  let processed = 0;
+  let minted = 0;
 
   for (const log of pendingLogs) {
+    let processedLog = false;
+    let mintedForLog = 0;
+
     await runTransaction(db, async (transaction) => {
       const logRef = doc(db, "poop_logs", log.id);
       const userRef = doc(db, "users", log.userId);
-      const [logSnapshot, userSnapshot] = await Promise.all([
+      const [logSnapshot, userSnapshot, headSnapshot] = await Promise.all([
         transaction.get(logRef),
         transaction.get(userRef),
+        transaction.get(poopcoinChainHeadRef),
       ]);
       const latestLog = logSnapshot.data() as PoopLog | undefined;
       const targetUser = userSnapshot.data() as AppUser | undefined;
 
-      if (!latestLog || latestLog.poopcoinTransactionHash || !targetUser) {
+      if (!latestLog || latestLog.poopcoinTransactionHash || latestLog.poopcoinsEarned != null || !targetUser) {
         return;
       }
 
-      const { hash } = await appendPoopcoinTransaction(transaction, {
-        type: "legacy_mint",
-        entries: [{ userId: log.userId, delta: 1 }],
-        amount: 1,
-        createdBy: admin.uid,
-        createdByRole: admin.role,
-        toUserId: log.userId,
-        linkedLogId: log.id,
-        createdAt: latestLog.createdAt ?? Timestamp.now(),
-        reason: "Migracao inicial de logs antigos.",
-        supplyEffect: {
-          mintedDelta: 1,
-          circulatingDelta: 1,
-          requireMigratedSupply: true,
-        },
-      });
+      const poopcoinsEarned = resolveMintablePoopcoins(
+        headSnapshot.data() as Record<string, unknown> | undefined,
+        poopcoinsPerLog,
+      );
+      const poopcoinTransaction =
+        poopcoinsEarned > 0
+          ? await appendPoopcoinTransaction(transaction, {
+              type: "legacy_mint",
+              entries: [{ userId: log.userId, delta: poopcoinsEarned }],
+              amount: poopcoinsEarned,
+              createdBy: admin.uid,
+              createdByRole: admin.role,
+              toUserId: log.userId,
+              linkedLogId: log.id,
+              createdAt: latestLog.createdAt ?? Timestamp.now(),
+              reason: "Migracao inicial de logs antigos.",
+              supplyEffect: {
+                mintedDelta: poopcoinsEarned,
+                circulatingDelta: poopcoinsEarned,
+                requireMigratedSupply: true,
+              },
+            })
+          : null;
 
-      transaction.update(logRef, { poopcoinTransactionHash: hash, poopcoinsEarned: 1 });
+      transaction.update(logRef, {
+        poopcoinTransactionHash: poopcoinTransaction?.hash ?? null,
+        poopcoinsEarned,
+      });
       transaction.update(userRef, {
-        poopcoinBalance: increment(1),
+        ...(poopcoinsEarned > 0 ? { poopcoinBalance: increment(poopcoinsEarned) } : {}),
         poopcoinMigratedAt: Timestamp.now(),
       });
+      processedLog = true;
+      mintedForLog = poopcoinsEarned;
     });
-    migrated += 1;
+
+    if (processedLog) {
+      processed += 1;
+      minted += mintedForLog;
+    }
   }
 
-  if (migrated > 0) {
+  if (processed > 0) {
     await runTransaction(db, async (transaction) => {
       transaction.set(
         doc(adminLogsRef),
         createAuditLog({
           action: "migrate_poopcoins",
           admin,
-          delta: migrated,
-          poopcoins: migrated,
+          delta: processed,
+          poopcoins: minted,
         }),
       );
     });
   }
 
-  return migrated;
+  return processed;
 }
 
 export async function recalculatePoopcoinSupply(admin: AppUser) {

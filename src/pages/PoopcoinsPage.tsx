@@ -4,7 +4,7 @@ import { Coins, Copy, SendHorizontal } from "lucide-react";
 import { AvatarImage } from "../components/AvatarImage";
 import { Card } from "../components/Card";
 import { formatDateTime } from "../utils/date";
-import type { AppUser, PoopcoinTransaction } from "../types";
+import type { AppSettings, AppUser, PoopcoinSupplySummary, PoopcoinTransaction } from "../types";
 import {
   formatPoopcoins,
   normalizePoopcoinAmount,
@@ -38,7 +38,7 @@ function transactionSummary(transaction: PoopcoinTransaction, usersById: Map<str
   }
 
   if (transaction.type === "cuiter_spend") {
-    return `${fromName} gastou 1 Poopcoin no Cuiter`;
+    return `${fromName} queimou ${formatPoopcoins(transaction.amount)} PC no Cuiter`;
   }
 
   if (transaction.type === "reversal") {
@@ -51,17 +51,31 @@ function transactionSummary(transaction: PoopcoinTransaction, usersById: Map<str
     return `${targetName}: ${transaction.reason ?? "ajuste manual"}`;
   }
 
-  return toName ? `${toName} recebeu 1 Poopcoin` : "Movimentacao registrada";
+  return toName ? `${toName} recebeu ${formatPoopcoins(transaction.amount)} PC` : "Movimentacao registrada";
+}
+
+function SupplyStat({ label, value, hint }: { label: string; value: number; hint?: string }) {
+  return (
+    <div className="rounded-2xl border border-line/10 bg-panel-strong/40 p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-fg-muted">{label}</p>
+      <p className="mt-2 text-2xl font-black text-fg">{formatPoopcoins(value)}</p>
+      {hint ? <p className="mt-1 text-xs text-fg-muted">{hint}</p> : null}
+    </div>
+  );
 }
 
 export function PoopcoinsPage({
   user,
   users,
   transactions,
+  appSettings,
+  supply,
 }: {
   user: AppUser;
   users: AppUser[];
   transactions: PoopcoinTransaction[];
+  appSettings: AppSettings;
+  supply: PoopcoinSupplySummary;
 }) {
   const [recipientUid, setRecipientUid] = useState("");
   const [amount, setAmount] = useState("1");
@@ -134,7 +148,9 @@ export function PoopcoinsPage({
             <div className="min-w-0">
               <p className="text-sm font-bold text-accent-strong">Carteira Poopcoin</p>
               <h2 className="text-4xl font-black text-fg">{formatPoopcoins(balance)}</h2>
-              <p className="mt-1 text-sm text-fg-muted">1 Poopcoin = 1 registro validado.</p>
+              <p className="mt-1 text-sm text-fg-muted">
+                Cada registro validado gera {formatPoopcoins(appSettings.poopcoinsPerLog)} PC enquanto houver suprimento.
+              </p>
             </div>
           </div>
 
@@ -154,6 +170,27 @@ export function PoopcoinsPage({
               </button>
             </div>
           </div>
+        </div>
+      </Card>
+
+      <Card>
+        <div className="mb-4">
+          <p className="text-sm font-bold text-accent-strong">Oferta limitada</p>
+          <h2 className="text-2xl font-black text-fg">Suprimento PoopCoin</h2>
+          <p className="mt-1 text-sm text-fg-muted">
+            Posts no Cuiter custam {formatPoopcoins(appSettings.cuiterPostCost)} PC e queimam as moedas gastas.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SupplyStat label="Total" value={supply.totalSupply} hint="Oferta fixa" />
+          <SupplyStat label="Emitidas" value={supply.mintedSupply} hint="Reservadas nas carteiras" />
+          <SupplyStat label="Queimadas" value={supply.burnedSupply} hint="Removidas de circulacao" />
+          <SupplyStat
+            label="Disponiveis"
+            value={supply.availableSupply}
+            hint={supply.supplyMigratedAt ? "Para novos registros" : "Recalculo pendente no Admin"}
+          />
         </div>
       </Card>
 

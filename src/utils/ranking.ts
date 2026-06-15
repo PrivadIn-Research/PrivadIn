@@ -5,29 +5,37 @@ const DICEBEAR_URL_PREFIX = "https://api.dicebear.com/";
 
 export function rankUsers(users: AppUser[], logs: PoopLog[] = []): RankedUser[] {
   const activeUsers = users.filter((user) => user.isActive !== false);
-  const currentCompetitionFirstLogAt = new Map<string, number>();
+  const latestLogAt = new Map<string, number>();
+  const currentCompetitionLatestLogAt = new Map<string, number>();
 
   for (const log of logs) {
-    if (!log.isWeeklyActive) continue;
     const createdAtMs = log.createdAt?.toMillis?.() ?? 0;
-    const previous = currentCompetitionFirstLogAt.get(log.userId);
-    if (previous == null || createdAtMs < previous) {
-      currentCompetitionFirstLogAt.set(log.userId, createdAtMs);
+    const previousLatest = latestLogAt.get(log.userId) ?? 0;
+
+    if (createdAtMs > previousLatest) {
+      latestLogAt.set(log.userId, createdAtMs);
+    }
+
+    if (!log.isWeeklyActive) continue;
+
+    const previousWeeklyLatest = currentCompetitionLatestLogAt.get(log.userId) ?? 0;
+    if (createdAtMs > previousWeeklyLatest) {
+      currentCompetitionLatestLogAt.set(log.userId, createdAtMs);
     }
   }
 
   const overall = [...activeUsers].sort((a, b) => {
     if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-    const aFirst = a.firstLogAt?.toMillis() ?? a.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
-    const bFirst = b.firstLogAt?.toMillis() ?? b.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER;
-    return aFirst - bFirst;
+    const aLatest = latestLogAt.get(a.uid) ?? a.lastLogAt?.toMillis() ?? a.firstLogAt?.toMillis() ?? a.createdAt?.toMillis() ?? 0;
+    const bLatest = latestLogAt.get(b.uid) ?? b.lastLogAt?.toMillis() ?? b.firstLogAt?.toMillis() ?? b.createdAt?.toMillis() ?? 0;
+    return bLatest - aLatest;
   });
 
   const weekly = [...activeUsers].sort((a, b) => {
     if (b.weeklyPoints !== a.weeklyPoints) return b.weeklyPoints - a.weeklyPoints;
-    const aFirst = currentCompetitionFirstLogAt.get(a.uid) ?? Number.MAX_SAFE_INTEGER;
-    const bFirst = currentCompetitionFirstLogAt.get(b.uid) ?? Number.MAX_SAFE_INTEGER;
-    return aFirst - bFirst;
+    const aLatest = currentCompetitionLatestLogAt.get(a.uid) ?? (a.weeklyPoints > 0 ? a.lastLogAt?.toMillis() : undefined) ?? 0;
+    const bLatest = currentCompetitionLatestLogAt.get(b.uid) ?? (b.weeklyPoints > 0 ? b.lastLogAt?.toMillis() : undefined) ?? 0;
+    return bLatest - aLatest;
   });
 
   const weeklyRanks = new Map(weekly.map((user, index) => [user.uid, index + 1]));

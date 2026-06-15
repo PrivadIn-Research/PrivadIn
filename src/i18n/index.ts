@@ -103,21 +103,25 @@ i18n.addResources("pt-BR", "admin", {
     adjustPoopcoins: "{{admin}} ajustou {{direction}}{{count}} Poopcoins para {{target}}.",
     reversePoopcoinTransaction: "{{admin}} reverteu uma transacao Poopcoin.",
     migratePoopcoins: "{{admin}} migrou {{count}} Poopcoins de logs antigos.",
+    recalculatePoopcoinSupply: "{{admin}} recalculou o suprimento usando {{count}} Poopcoins nas carteiras.",
+    updatePoopcoinRules: "{{admin}} definiu {{poopcoins}} PC por registro e {{cost}} PC por post no Cuiter.",
   },
   actionLabels: {
     update_terms_of_use: "Termos publicados",
     adjust_poopcoins: "Ajuste de Poopcoins",
     reverse_poopcoin_transaction: "Reversao de Poopcoins",
     migrate_poopcoins: "Migracao de Poopcoins",
+    recalculate_poopcoin_supply: "Suprimento recalculado",
+    update_poopcoin_rules: "Regras PoopCoin",
   },
 });
 
 i18n.addResources("pt-BR", "cuiter", {
-  unlockInfo: "Voce precisa de pelo menos 1 Poopcoin para publicar no Cuiter.",
+  unlockInfo: "Voce precisa de Poopcoins suficientes para publicar no Cuiter.",
   credits_one: "{{chars}} caracteres restantes · {{count}} Poopcoin disponivel",
   credits_other: "{{chars}} caracteres restantes · {{count}} Poopcoins disponiveis",
   service: {
-    missingCredits: "Saldo insuficiente. Registre uma cagada validada para ganhar 1 Poopcoin.",
+    missingCredits: "Saldo insuficiente. O post no Cuiter custa {{cost}} Poopcoins.",
   },
 });
 
@@ -208,21 +212,25 @@ i18n.addResources("en-US", "admin", {
     adjustPoopcoins: "{{admin}} adjusted {{direction}}{{count}} Poopcoins for {{target}}.",
     reversePoopcoinTransaction: "{{admin}} reversed a Poopcoin transaction.",
     migratePoopcoins: "{{admin}} migrated {{count}} Poopcoins from old logs.",
+    recalculatePoopcoinSupply: "{{admin}} recalculated supply using {{count}} Poopcoins in wallets.",
+    updatePoopcoinRules: "{{admin}} set {{poopcoins}} PC per log and {{cost}} PC per Cuiter post.",
   },
   actionLabels: {
     update_terms_of_use: "Terms published",
     adjust_poopcoins: "Poopcoins adjustment",
     reverse_poopcoin_transaction: "Poopcoins reversal",
     migrate_poopcoins: "Poopcoins migration",
+    recalculate_poopcoin_supply: "Supply recalculated",
+    update_poopcoin_rules: "PoopCoin rules",
   },
 });
 
 i18n.addResources("en-US", "cuiter", {
-  unlockInfo: "You need at least 1 Poopcoin to publish on Cuiter.",
+  unlockInfo: "You need enough Poopcoins to publish on Cuiter.",
   credits_one: "{{chars}} characters left · {{count}} Poopcoin available",
   credits_other: "{{chars}} characters left · {{count}} Poopcoins available",
   service: {
-    missingCredits: "Insufficient balance. Log a validated break to earn 1 Poopcoin.",
+    missingCredits: "Insufficient balance. A Cuiter post costs {{cost}} Poopcoins.",
   },
 });
 

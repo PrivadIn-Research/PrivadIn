@@ -27,11 +27,8 @@ service cloud.firestore {
     // Campos que o usuário comum NUNCA pode alterar por conta própria (anti-cheat)
     function userProtectedFields() {
       return [
-        "uid", "email", "role", "totalPoints", "weeklyPoints",
-        "currentDailyStreak", "currentWeeklyStreak", "bestStreak",
-        "createdAt", "firstLogAt", "lastLogAt", "cooldownUntil",
-        "isActive", "deactivatedAt", "deactivatedBy",
-        "poopcoinBalance", "poopcoinMigratedAt"
+        "uid", "email", "role", "createdAt",
+        "isActive", "deactivatedAt", "deactivatedBy"
       ];
     }
 
@@ -100,12 +97,106 @@ service cloud.firestore {
         && (!("reason" in request.resource.data) || request.resource.data.reason == null || (request.resource.data.reason is string && request.resource.data.reason.size() <= 240));
     }
 
+    function validUserMintLogTransaction() {
+      return request.resource.data.type == "mint_log"
+        && request.resource.data.linkedLogId is string
+        && existsAfter(/databases/$(database)/documents/poop_logs/$(request.resource.data.linkedLogId))
+        && getAfter(/databases/$(database)/documents/poop_logs/$(request.resource.data.linkedLogId)).data.userId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/poop_logs/$(request.resource.data.linkedLogId)).data.poopcoinTransactionHash == request.resource.data.hash
+        && getAfter(/databases/$(database)/documents/poop_logs/$(request.resource.data.linkedLogId)).data.poopcoinsEarned == request.resource.data.amount;
+    }
+
+    function validUserCuiterSpendTransaction() {
+      return request.resource.data.type == "cuiter_spend"
+        && request.resource.data.linkedPostId is string
+        && existsAfter(/databases/$(database)/documents/cuiter_posts/$(request.resource.data.linkedPostId))
+        && getAfter(/databases/$(database)/documents/cuiter_posts/$(request.resource.data.linkedPostId)).data.userId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/cuiter_posts/$(request.resource.data.linkedPostId)).data.poopcoinTransactionHash == request.resource.data.hash;
+    }
+
+    function validOptionalPoopcoinRuleSettings() {
+      return (!("poopcoinsPerLog" in request.resource.data) || (
+          request.resource.data.poopcoinsPerLog is int
+          && request.resource.data.poopcoinsPerLog >= 1
+          && request.resource.data.poopcoinsPerLog <= 100000
+        ))
+        && (!("cuiterPostCost" in request.resource.data) || (
+          request.resource.data.cuiterPostCost is int
+          && request.resource.data.cuiterPostCost >= 1
+          && request.resource.data.cuiterPostCost <= 100000
+        ))
+        && (!("poopcoinsPerLogUpdatedAt" in request.resource.data) || request.resource.data.poopcoinsPerLogUpdatedAt is timestamp)
+        && (!("poopcoinsPerLogUpdatedBy" in request.resource.data) || request.resource.data.poopcoinsPerLogUpdatedBy is string);
+    }
+
+    function hasPoopcoinSupplyFields(data) {
+      return "totalSupply" in data
+        || "mintedSupply" in data
+        || "burnedSupply" in data
+        || "circulatingSupply" in data
+        || "supplyMigratedAt" in data;
+    }
+
+    function validPoopcoinSupplyHead() {
+      return !hasPoopcoinSupplyFields(request.resource.data)
+        || (
+          request.resource.data.totalSupply is int
+          && request.resource.data.totalSupply == 1000000
+          && request.resource.data.mintedSupply is int
+          && request.resource.data.mintedSupply >= 0
+          && request.resource.data.mintedSupply <= request.resource.data.totalSupply
+          && request.resource.data.burnedSupply is int
+          && request.resource.data.burnedSupply >= 0
+          && request.resource.data.burnedSupply <= request.resource.data.totalSupply
+          && request.resource.data.circulatingSupply is int
+          && request.resource.data.circulatingSupply >= 0
+          && request.resource.data.circulatingSupply <= request.resource.data.totalSupply
+          && request.resource.data.supplyMigratedAt is timestamp
+        );
+    }
+
+    function latestPoopcoinTransaction() {
+      return getAfter(/databases/$(database)/documents/poopcoin_transactions/$(request.resource.data.lastHash)).data;
+    }
+
+    function unchangedPoopcoinSupply() {
+      return request.resource.data.totalSupply == resource.data.totalSupply
+        && request.resource.data.mintedSupply == resource.data.mintedSupply
+        && request.resource.data.burnedSupply == resource.data.burnedSupply
+        && request.resource.data.circulatingSupply == resource.data.circulatingSupply
+        && request.resource.data.supplyMigratedAt == resource.data.supplyMigratedAt;
+    }
+
+    function validUserPoopcoinSupplyTransition() {
+      return !hasPoopcoinSupplyFields(request.resource.data)
+        || (
+          hasPoopcoinSupplyFields(resource.data)
+          && (
+            (latestPoopcoinTransaction().type in ["mint_log", "legacy_mint"]
+              && request.resource.data.totalSupply == resource.data.totalSupply
+              && request.resource.data.mintedSupply == resource.data.mintedSupply + latestPoopcoinTransaction().amount
+              && request.resource.data.burnedSupply == resource.data.burnedSupply
+              && request.resource.data.circulatingSupply == resource.data.circulatingSupply + latestPoopcoinTransaction().amount
+              && request.resource.data.supplyMigratedAt == resource.data.supplyMigratedAt)
+            || (latestPoopcoinTransaction().type == "cuiter_spend"
+              && request.resource.data.totalSupply == resource.data.totalSupply
+              && request.resource.data.mintedSupply == resource.data.mintedSupply
+              && request.resource.data.burnedSupply == resource.data.burnedSupply + latestPoopcoinTransaction().amount
+              && request.resource.data.circulatingSupply == resource.data.circulatingSupply - latestPoopcoinTransaction().amount
+              && request.resource.data.supplyMigratedAt == resource.data.supplyMigratedAt)
+            || (latestPoopcoinTransaction().type == "transfer" && unchangedPoopcoinSupply())
+          )
+        );
+    }
+
     function userCanCreatePoopcoinTransaction() {
       return signedIn()
         && validPoopcoinTransaction()
         && request.resource.data.createdBy == request.auth.uid
         && (
-          request.resource.data.type in ["mint_log", "transfer", "cuiter_spend"]
+          validUserMintLogTransaction()
+          || validUserCuiterSpendTransaction()
+          || request.resource.data.type == "transfer"
           || isAdmin()
         );
     }
@@ -166,7 +257,7 @@ service cloud.firestore {
     // CONFIGURAÇÕES DO APP
     match /app_settings/{settingId} {
       allow read: if true;
-      allow create, update: if isAdmin();
+      allow create, update: if isAdmin() && validOptionalPoopcoinRuleSettings();
       allow delete: if false;
     }
 
@@ -208,15 +299,28 @@ service cloud.firestore {
     // CABECA DO ENCADEAMENTO POOPCOIN
     match /poopcoin_chain/{chainDoc} {
       allow read: if signedIn();
-      allow create, update: if signedIn()
-        && chainDoc == "head"
-        && request.resource.data.keys().hasOnly(["lastHash", "lastSequence", "updatedAt"])
+      allow create, update: if chainDoc == "head"
+        && request.resource.data.keys().hasOnly([
+          "lastHash", "lastSequence", "updatedAt",
+          "totalSupply", "mintedSupply", "burnedSupply",
+          "circulatingSupply", "supplyMigratedAt"
+        ])
         && validPoopcoinHash(request.resource.data.lastHash)
         && request.resource.data.lastSequence is int
-        && request.resource.data.lastSequence > 0
+        && request.resource.data.lastSequence >= 0
         && request.resource.data.updatedAt is timestamp
-        && existsAfter(/databases/$(database)/documents/poopcoin_transactions/$(request.resource.data.lastHash));
+        && validPoopcoinSupplyHead()
+        && (
+          isAdmin()
+          || (
+            signedIn()
+            && existsAfter(/databases/$(database)/documents/poopcoin_transactions/$(request.resource.data.lastHash))
+            && latestPoopcoinTransaction().createdBy == request.auth.uid
+            && validUserPoopcoinSupplyTransition()
+          )
+        );
       allow delete: if false;
     }
+
   }
 }

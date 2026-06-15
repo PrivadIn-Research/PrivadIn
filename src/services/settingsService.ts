@@ -19,12 +19,18 @@ const MAX_COOLDOWN_MINUTES = 1440;
 const DEFAULT_POINTS_PER_LOG = 2000;
 const MIN_POINTS_PER_LOG = 1;
 const MAX_POINTS_PER_LOG = 100000;
+export const DEFAULT_POOPCOINS_PER_LOG = 1;
+export const DEFAULT_CUITER_POST_COST = 1000;
+const MIN_POOPCOIN_RULE_VALUE = 1;
+const MAX_POOPCOIN_RULE_VALUE = 100000;
 const DEFAULT_EDITION = 17;
 export const MAX_COMPETITION_ANNOUNCEMENT_LENGTH = 280;
 
 export const defaultAppSettings: AppSettings = {
   cooldownMinutes: DEFAULT_COOLDOWN_MINUTES,
   pointsPerLog: DEFAULT_POINTS_PER_LOG,
+  poopcoinsPerLog: DEFAULT_POOPCOINS_PER_LOG,
+  cuiterPostCost: DEFAULT_CUITER_POST_COST,
   edition: DEFAULT_EDITION,
   overallRankingVisible: false,
   termsOfUseText: DEFAULT_TERMS_OF_USE_TEXT,
@@ -50,6 +56,15 @@ export function normalizePointsPerLog(value: number) {
   );
 }
 
+export function normalizePoopcoinRuleValue(value: number, fallback = DEFAULT_POOPCOINS_PER_LOG) {
+  if (!Number.isFinite(value)) return fallback;
+
+  return Math.min(
+    MAX_POOPCOIN_RULE_VALUE,
+    Math.max(MIN_POOPCOIN_RULE_VALUE, Math.trunc(value)),
+  );
+}
+
 function normalizeEdition(value: number) {
   if (!Number.isFinite(value)) return DEFAULT_EDITION;
   return Math.max(1, Math.trunc(value));
@@ -66,6 +81,14 @@ export function parseAppSettings(
     ),
     pointsPerLog: normalizePointsPerLog(
       Number(data?.pointsPerLog ?? DEFAULT_POINTS_PER_LOG),
+    ),
+    poopcoinsPerLog: normalizePoopcoinRuleValue(
+      Number(data?.poopcoinsPerLog ?? DEFAULT_POOPCOINS_PER_LOG),
+      DEFAULT_POOPCOINS_PER_LOG,
+    ),
+    cuiterPostCost: normalizePoopcoinRuleValue(
+      Number(data?.cuiterPostCost ?? DEFAULT_CUITER_POST_COST),
+      DEFAULT_CUITER_POST_COST,
     ),
     edition: normalizeEdition(Number(data?.edition ?? DEFAULT_EDITION)),
     overallRankingVisible: data?.overallRankingVisible === true,
@@ -157,6 +180,59 @@ export async function updatePointsPerLog(
       action: "update_points_per_log",
       admin,
       pointsPerLog: normalizedPoints,
+    }),
+  );
+
+  await batch.commit();
+}
+
+export async function updatePoopcoinRules(
+  admin: AppUser,
+  poopcoinsPerLog: number,
+  cuiterPostCost: number,
+) {
+  const normalizedPoopcoinsPerLog = normalizePoopcoinRuleValue(
+    poopcoinsPerLog,
+    DEFAULT_POOPCOINS_PER_LOG,
+  );
+  const normalizedCuiterPostCost = normalizePoopcoinRuleValue(
+    cuiterPostCost,
+    DEFAULT_CUITER_POST_COST,
+  );
+  const now = Timestamp.now();
+  const currentSettingsSnapshot = await getDoc(appSettingsDocRef);
+  const currentPoopcoinsPerLog = normalizePoopcoinRuleValue(
+    Number(currentSettingsSnapshot.data()?.poopcoinsPerLog ?? DEFAULT_POOPCOINS_PER_LOG),
+    DEFAULT_POOPCOINS_PER_LOG,
+  );
+  const batch = writeBatch(db);
+
+  batch.set(
+    appSettingsDocRef,
+    {
+      poopcoinsPerLog: normalizedPoopcoinsPerLog,
+      cuiterPostCost: normalizedCuiterPostCost,
+      poopcoinsPerLogUpdatedAt:
+        normalizedPoopcoinsPerLog !== currentPoopcoinsPerLog
+          ? now
+          : currentSettingsSnapshot.data()?.poopcoinsPerLogUpdatedAt ?? now,
+      poopcoinsPerLogUpdatedBy:
+        normalizedPoopcoinsPerLog !== currentPoopcoinsPerLog
+          ? admin.uid
+          : currentSettingsSnapshot.data()?.poopcoinsPerLogUpdatedBy ?? admin.uid,
+      updatedAt: now,
+      updatedBy: admin.uid,
+    },
+    { merge: true },
+  );
+
+  batch.set(
+    doc(adminLogsRef),
+    createAuditLog({
+      action: "update_poopcoin_rules",
+      admin,
+      poopcoinsPerLog: normalizedPoopcoinsPerLog,
+      cuiterPostCost: normalizedCuiterPostCost,
     }),
   );
 

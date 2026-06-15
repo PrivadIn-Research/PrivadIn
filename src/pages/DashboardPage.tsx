@@ -1,7 +1,8 @@
 import confetti from "canvas-confetti";
 import toast from "react-hot-toast";
 import { Loader2, Share2, TimerReset } from "lucide-react";
-import { useState } from "react";
+import type { Timestamp } from "@firebase/firestore";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, MetricCard } from "../components/Card";
 import { RankingList } from "../components/RankingList";
@@ -15,15 +16,18 @@ import { registerPoopWithValidation } from "../services/poopService";
 import { createWeeklyRankingShareFile, RANKING_LIMIT } from "../utils/weeklyRankingShare";
 import { isRegisterPoopError } from "../utils/registerPoopError";
 
+const POOPCOIN_RULE_BANNER_MS = 24 * 60 * 60 * 1000;
+
 export function DashboardPage({
   user,
   rankedUsers,
   userLogs,
   cooldownMinutes,
   pointsPerLog,
+  poopcoinsPerLog,
+  poopcoinsPerLogUpdatedAt,
   edition,
   competitionAnnouncement,
-  overallRankingVisible,
   onPlaySound,
   onOpenProfile,
   onViewProfile,
@@ -33,9 +37,10 @@ export function DashboardPage({
   userLogs: PoopLog[];
   cooldownMinutes: number;
   pointsPerLog: number;
+  poopcoinsPerLog: number;
+  poopcoinsPerLogUpdatedAt?: Timestamp;
   edition: number;
   competitionAnnouncement: string;
-  overallRankingVisible: boolean;
   onPlaySound: () => void;
   onOpenProfile: () => void;
   onViewProfile: (uid: string) => void;
@@ -50,10 +55,24 @@ export function DashboardPage({
     : 0;
   const cooldownSeconds = Math.max(logCooldownSeconds, userCooldownSeconds);
   const formattedPointsPerLog = formatNumber(pointsPerLog);
+  const formattedPoopcoinsPerLog = formatNumber(poopcoinsPerLog);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSharingRanking, setIsSharingRanking] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const isOnCooldown = cooldownSeconds > 0;
   const cooldownWarningMessage = t("cooldownWarning");
+  const poopcoinRuleUpdatedAtMs = poopcoinsPerLogUpdatedAt?.toMillis?.() ?? 0;
+  const showPoopcoinRuleBanner =
+    poopcoinRuleUpdatedAtMs > 0 &&
+    nowMs - poopcoinRuleUpdatedAtMs < POOPCOIN_RULE_BANNER_MS;
+
+  useEffect(() => {
+    if (!showPoopcoinRuleBanner) return;
+
+    const remainingMs = Math.max(0, POOPCOIN_RULE_BANNER_MS - (Date.now() - poopcoinRuleUpdatedAtMs));
+    const timeoutId = window.setTimeout(() => setNowMs(Date.now()), remainingMs + 1000);
+    return () => window.clearTimeout(timeoutId);
+  }, [poopcoinRuleUpdatedAtMs, showPoopcoinRuleBanner]);
 
   async function handleRegister() {
     if (isOnCooldown || isRegistering) {
@@ -162,6 +181,17 @@ export function DashboardPage({
         </Card>
       ) : null}
 
+      {showPoopcoinRuleBanner ? (
+        <Card className="border-success/20 bg-success-soft/25">
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-success">Regra PoopCoin atualizada</p>
+            <p className="text-base font-semibold text-fg sm:text-lg">
+              Cada registro validado agora gera {formattedPoopcoinsPerLog} PC enquanto houver suprimento disponivel.
+            </p>
+          </div>
+        </Card>
+      ) : null}
+
       <section className="order-3 grid grid-cols-2 gap-3 sm:gap-4 md:order-1 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon="💩" label={t("metric.total")} value={formatNumber(user.totalPoints)} hint={t("metric.totalHint", { points: formattedPointsPerLog })} />
         <MetricCard icon="📊" label={t("metric.weeklyPoints")} value={formatNumber(user.weeklyPoints)} hint={t("metric.weeklyPointsHint")} />
@@ -204,7 +234,7 @@ export function DashboardPage({
         </Card>
       </section>
 
-      <section className={`order-2 grid gap-4 sm:gap-5 ${overallRankingVisible ? "xl:grid-cols-2" : ""}`}>
+      <section className="order-2 grid gap-4 sm:gap-5">
         <Card>
           <div className="mb-4">
             <p className="text-sm font-bold text-accent-strong">{t("weeklyEyebrow", { count: countThisWeek(userLogs) })}</p>
@@ -224,15 +254,13 @@ export function DashboardPage({
           </button>
         </Card>
 
-        {overallRankingVisible ? (
-          <Card>
-            <div className="mb-4">
-              <p className="text-sm font-bold text-accent-strong">{t("overallEyebrow")}</p>
-              <h2 className="text-2xl font-black text-fg">{t("overallTitle")}</h2>
-            </div>
-            <RankingList users={rankedUsers} currentUid={user.uid} onViewProfile={onViewProfile} />
-          </Card>
-        ) : null}
+        <Card>
+          <div className="mb-4">
+            <p className="text-sm font-bold text-accent-strong">{t("overallEyebrow")}</p>
+            <h2 className="text-2xl font-black text-fg">{t("overallTitle")}</h2>
+          </div>
+          <RankingList users={rankedUsers} currentUid={user.uid} onViewProfile={onViewProfile} />
+        </Card>
       </section>
     </div>
   );

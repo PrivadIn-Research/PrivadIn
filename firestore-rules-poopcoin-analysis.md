@@ -14,10 +14,11 @@
 ## Rule Changes
 - `app_settings` admin writes now validate optional `poopcoinsPerLog`, `cuiterPostCost`, and PoopCoin rule timestamp/by fields.
 - `poopcoin_chain/head` accepts supply fields: `totalSupply`, `mintedSupply`, `burnedSupply`, `circulatingSupply`, `supplyMigratedAt`.
-- Non-admin head updates must point at a just-created transaction and follow the expected supply transition for `mint_log`, `legacy_mint`, `cuiter_spend`, or unchanged supply for `transfer`.
-- Non-admin `mint_log` transactions must be paired with a `poop_logs/{id}` document created in the same commit; `cuiter_spend` transactions must be paired with a `cuiter_posts/{id}` document created in the same commit.
+- PoopCoin rules were simplified after registration `permission-denied`: authenticated users can write validly-shaped chain head updates and validly-shaped transactions created by themselves; admins can still write operational PoopCoin records.
+- The previous cross-document `getAfter()` checks between `poopcoin_chain/head`, `poopcoin_transactions`, `poop_logs`, and `cuiter_posts` were removed from the critical path to reduce rule complexity and evaluation failures.
 - Admin can recalculate the supply summary from current user wallet balances, still constrained to valid numeric ranges and the fixed `1,000,000` total supply.
 
 ## Residual Notes
 - Existing app behavior still relies on signed-in reads of `users`, which contains emails. This is pre-existing and preserved so current ranking/profile screens continue to work.
 - Existing user updates are broad for owners; this task focused on PoopCoin supply integrity rather than a full user document rules redesign.
+- Simplified PoopCoin writes are more permissive than the previous prototype. They are intended to restore app functionality quickly and should be hardened later, ideally with privileged server-side writes for ledger/supply updates.

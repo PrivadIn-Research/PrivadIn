@@ -106,7 +106,7 @@ export default function Mines({ config, globalConfig, balance, muted, onSettle }
     void settle(currentMultiplier, false, revealed.size);
   };
 
-  const reveal_all = phase === "busted" || phase === "cashed";
+  const revealAll = phase === "busted" || phase === "cashed";
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4">
@@ -117,7 +117,7 @@ export default function Mines({ config, globalConfig, balance, muted, onSettle }
         {Array.from({ length: tiles }, (_, index) => {
           const isRevealed = revealed.has(index);
           const isMine = mines.has(index);
-          const show = isRevealed || reveal_all;
+          const show = isRevealed || revealAll;
           return (
             <button
               key={index}

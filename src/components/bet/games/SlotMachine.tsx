@@ -122,7 +122,7 @@ export function SlotMachine({
     }, 90);
     timers.current.push(spinTimer);
 
-    window.setTimeout(async () => {
+    const stopTimer = window.setTimeout(async () => {
       window.clearInterval(spinTimer);
       setGrid(finalGrid);
 
@@ -150,6 +150,7 @@ export function SlotMachine({
         setSpinning(false);
       }
     }, stops[2] + 100);
+    timers.current.push(stopTimer);
   };
 
   return (

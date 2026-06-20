@@ -31,7 +31,7 @@ interface SettleInput {
   user: Pick<AppUser, "uid">;
   gameId: BetGameId;
   wager: number;
-  /** 0 = perdeu; >0 = ganhou (prêmio bruto = wager * multiplier). */
+  /** Multiplicador bruto (prêmio = wager * multiplier). <=0 perde; 0<mult<1 retorno parcial; 1 push; >1 ganha. */
   multiplier: number;
   meta?: Record<string, unknown>;
 }

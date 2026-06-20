@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { clsx } from "clsx";
 import toast from "react-hot-toast";
@@ -40,6 +40,10 @@ export default function Plinko({ config, globalConfig, balance, muted, onSettle 
   const [message, setMessage] = useState("Solte a bolinha e veja onde ela cai.");
   const [lastWin, setLastWin] = useState(0);
   const settledRef = useRef(false);
+  const intervalRef = useRef<number>(0);
+
+  // Cancela a animacao se o componente desmontar no meio da queda.
+  useEffect(() => () => window.clearInterval(intervalRef.current), []);
 
   const drop = async () => {
     if (dropping || bet > balance || bet < minBet) return;
@@ -57,14 +61,15 @@ export default function Plinko({ config, globalConfig, balance, muted, onSettle 
     // Animacao em passos: a bolinha desce e migra para a coluna final.
     let step = 0;
     const totalSteps = rows;
-    const interval = window.setInterval(() => {
+    window.clearInterval(intervalRef.current);
+    intervalRef.current = window.setInterval(() => {
       step += 1;
       sound.tick();
       const top = (step / totalSteps) * 92;
       const left = 50 + ((leftPercent - 50) * step) / totalSteps + (Math.random() - 0.5) * 4;
       setBall({ top, left });
       if (step >= totalSteps) {
-        window.clearInterval(interval);
+        window.clearInterval(intervalRef.current);
         setBall({ top: 92, left: leftPercent });
         void finish(bin, multiplier);
       }

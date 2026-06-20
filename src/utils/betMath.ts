@@ -6,9 +6,10 @@
  * resultado em poopcoins — o visual nunca pode contradizer o valor liquidado.
  *
  * Convencao de multiplicador:
- *   0   => o jogador perdeu (prêmio = 0)
- *   1   => devolveu a aposta (push)
- *   >1  => ganhou (prêmio = wager * multiplier)
+ *   <= 0         => o jogador perdeu (prêmio = 0)
+ *   0 < mult < 1 => retorno parcial (prêmio = wager * mult, ex.: Plinko)
+ *   1            => devolveu a aposta (push)
+ *   > 1          => ganhou (prêmio = wager * mult)
  */
 
 export function clamp(value: number, min: number, max: number) {

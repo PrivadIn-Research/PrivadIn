@@ -143,6 +143,28 @@ service cloud.firestore {
         && (request.resource.data.createdBy == request.auth.uid || isAdmin());
     }
 
+    // Carteira-sistema da banca da PrivadIn Bet.
+    function isBetHouseWallet(userId) {
+      return userId == "privadin_bet_house";
+    }
+
+    // Liquidacao soma-zero da PrivadIn Bet: o jogador ajusta o saldo da banca.
+    // ATENCAO: herda o MODELO DE CONFIANCA FRACO ja existente no app (o dono
+    // tambem pode editar o proprio saldo via canUpdatePoopcoinBalance). Aqui so
+    // liberamos a atualizacao do campo de saldo da carteira-banca, limitada a uma
+    // variacao plausivel. As apostas NUNCA tocam o ledger (poopcoin_transactions).
+    // Endurecimento real (RTP/banca a prova de trapaca) exige Cloud Function.
+    function canPlayerSettleBetHouse(userId) {
+      return signedIn()
+        && isBetHouseWallet(userId)
+        && changedOnly(["poopcoinBalance"])
+        && request.resource.data.poopcoinBalance is number
+        && request.resource.data.poopcoinBalance >= 0
+        && request.resource.data.poopcoinBalance <= 1000000
+        && request.resource.data.poopcoinBalance - resource.data.poopcoinBalance >= -1000000
+        && request.resource.data.poopcoinBalance - resource.data.poopcoinBalance <= 1000000;
+    }
+
     function canUpdatePoopcoinBalance(userId) {
       return signedIn()
         && changedOnly(["poopcoinBalance", "poopcoinMigratedAt"])
@@ -169,10 +191,11 @@ service cloud.firestore {
     // PERFIS DE USUÁRIO
     match /users/{userId} {
       allow read: if signedIn();
-      // Permite criar se for o dono
-      allow create: if isOwner(userId) && isPlayerRoleOnCreate();
-      // Admin edita tudo. Dono edita o que quiser, desde que não trapaceie os pontos/status
-      allow update: if (isOwner(userId) && ownerKeepsProtectedUserFields()) || isAdmin() || canUpdatePoopcoinBalance(userId);
+      // Permite criar se for o dono; admin pode criar a carteira-sistema da banca
+      allow create: if (isOwner(userId) && isPlayerRoleOnCreate()) || isAdmin();
+      // Admin edita tudo. Dono edita o que quiser, desde que não trapaceie os pontos/status.
+      // canPlayerSettleBetHouse libera o ajuste de saldo da banca na liquidacao da Bet.
+      allow update: if (isOwner(userId) && ownerKeepsProtectedUserFields()) || isAdmin() || canUpdatePoopcoinBalance(userId) || canPlayerSettleBetHouse(userId);
       allow delete: if false;
     }
 
@@ -187,6 +210,28 @@ service cloud.firestore {
     // DADOS PRIVADOS DO USUÁRIO
     match /user_private/{userId} {
       allow read, write: if isOwner(userId);
+
+      // Subcoleções privadas (ex.: bet_rounds da PrivadIn Bet). Só o dono lê/escreve.
+      match /{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // PRIVADIN BET — configuração (admin) e métricas agregadas anônimas
+    match /privadin_bet/config {
+      allow read: if signedIn();            // clientes precisam saber jogos ativos e limites
+      allow create, update: if isAdmin();   // só admin configura
+      allow delete: if false;
+    }
+    match /privadin_bet/stats {
+      // Métricas agregadas e ANÔNIMAS (sem identificar usuários). O jogador
+      // incrementa na liquidação; nada aqui revela aposta individual.
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["totalWagered", "totalPaidOut", "houseProfit", "updatedAt"]);
+      allow update: if signedIn()
+        && changedOnly(["totalWagered", "totalPaidOut", "houseProfit", "updatedAt"]);
+      allow delete: if false;
     }
 
     // LOGS DE AUDITORIA (ADMIN)

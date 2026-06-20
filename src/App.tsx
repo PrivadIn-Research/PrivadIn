@@ -24,6 +24,7 @@ import { EditProfilePage } from "./pages/EditProfilePage";
 import { UserProfilePage } from "./pages/UserProfilePage";
 import { CuiterPage } from "./pages/CuiterPage";
 import { PoopcoinsPage } from "./pages/PoopcoinsPage";
+import { BetPage } from "./pages/BetPage";
 import { useTheme } from "./hooks/useTheme";
 import type { AppView } from "./types";
 
@@ -136,6 +137,7 @@ function AppContent() {
           supply={poopcoinSupply}
         />
       ) : null}
+      {view === "bet" ? <BetPage user={liveUser} muted={muted} /> : null}
       {view === "history" ? <HistoryPage logs={userLogs} /> : null}
       {view === "stats" ? <StatsPage user={liveUser} logs={userLogs} allLogs={allLogs} rankedUsers={rankedUsers} overallRankingVisible={appSettings.overallRankingVisible === true} /> : null}
       {view === "cuiter" ? (

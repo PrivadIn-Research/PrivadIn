@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AvatarImage } from "../components/AvatarImage";
 import { Card } from "../components/Card";
+import { BetAdminPanel } from "../components/admin/BetAdminPanel";
 import type {
   AdminAuditLog,
   AppSettings,
@@ -941,6 +942,10 @@ export function AdminPage({
           )}
         </div>
         </CollapsibleSection>
+      </Card>
+
+      <Card className="order-15">
+        <BetAdminPanel admin={admin} />
       </Card>
     </div>
   );

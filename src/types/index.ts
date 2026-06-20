@@ -3,7 +3,7 @@ import type { Timestamp } from "@firebase/firestore";
 export type AppLanguage = "pt-BR" | "en-US" | "es-ES" | "zh-Hans" | "ar" | "jam-JM" | "pap-CW";
 export type AppTheme = "light" | "dark";
 
-export type AppView = "dashboard" | "poopcoins" | "history" | "stats" | "cuiter" | "admin" | "profile" | "edit-profile";
+export type AppView = "dashboard" | "poopcoins" | "history" | "stats" | "cuiter" | "admin" | "profile" | "edit-profile" | "bet";
 
 export type UserRole = "player" | "admin";
 
@@ -49,6 +49,8 @@ export interface AppUser {
   poopcoinBalance?: number;
   poopcoinMigratedAt?: Timestamp;
   bio?: string;
+  /** Carteira-sistema (ex.: banca da PrivadIn Bet). Escondida em rankings/listas/transferencias. */
+  isSystem?: boolean;
 }
 
 export interface PoopLog {
@@ -168,7 +170,10 @@ export type AdminAuditAction =
   | "adjust_poopcoins"
   | "reverse_poopcoin_transaction"
   | "migrate_poopcoins"
-  | "recalculate_poopcoin_supply";
+  | "recalculate_poopcoin_supply"
+  | "update_bet_config"
+  | "set_bet_bankroll"
+  | "toggle_bet_game";
 
 export interface AdminAuditLog {
   id: string;
@@ -247,6 +252,83 @@ export interface StatSummary {
   productiveHour: string;
   weeklyTotal: number;
   dailyAverage: number;
+}
+
+// ----------------------------------------
+// PRIVADIN BET (mini casa de apostas em poopcoins)
+// ----------------------------------------
+
+export type BetGameId = string; // ex.: "tigrinho", "fortune_ox", "spaceman", "jetx", "mines", "plinko", "blackjack"
+
+export interface BetGameConfig {
+  id: BetGameId;
+  label: string;
+  icon?: string;
+  order: number;
+  enabled: boolean;
+  /** RTP esperado 0..1 (para crash games equivale ao fator de borda da casa). */
+  rtp: number;
+  minPayoutMultiplier: number;
+  maxPayoutMultiplier: number;
+  minBet: number;
+  maxBet: number;
+  winChance?: number;
+  volatility?: "low" | "medium" | "high";
+  extra?: Record<string, number>;
+}
+
+export interface PrivadInBetConfig {
+  enabled: boolean;
+  houseUid: string;
+  globalMinBet: number;
+  globalMaxBet: number;
+  maxPayoutPerRound: number;
+  maxExposureFractionOfBankroll: number;
+  games: Record<BetGameId, BetGameConfig>;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
+/** Metricas agregadas e ANONIMAS, guardadas em `privadin_bet/stats` (gravavel pelo jogador na liquidacao). */
+export interface BetStats {
+  totalWagered: number;
+  totalPaidOut: number;
+  houseProfit: number;
+  updatedAt?: Timestamp;
+}
+
+export interface BetRound {
+  id: string;
+  gameId: BetGameId;
+  createdAt: Timestamp;
+  wager: number;
+  multiplier: number;
+  payout: number;
+  net: number;
+  balanceAfter: number;
+  meta?: Record<string, unknown>;
+}
+
+export interface BetSettlement {
+  payout: number;
+  net: number;
+  balanceAfter: number;
+  cappedByBankroll: boolean;
+}
+
+export interface BetRoundInput {
+  wager: number;
+  multiplier: number;
+  meta?: Record<string, unknown>;
+}
+
+export interface BetGameProps {
+  user: AppUser;
+  balance: number;
+  config: BetGameConfig;
+  globalConfig: PrivadInBetConfig;
+  muted: boolean;
+  onSettle: (round: BetRoundInput) => Promise<BetSettlement>;
 }
 
 export interface SalarySummary {

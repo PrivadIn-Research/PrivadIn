@@ -1,9 +1,10 @@
-import { BarChart3, Coins, History, LayoutDashboard, LogOut, MessageCircle, Moon, Shield, Sun, User, Volume2, VolumeX } from "lucide-react";
+import { BarChart3, Coins, Dices, History, LayoutDashboard, LogOut, MessageCircle, Moon, Shield, Sun, User, Volume2, VolumeX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "../constants/app";
 import type { AppTheme, AppUser, AppView } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../hooks/useTheme";
+import { useBetConfig } from "../hooks/useFirestoreData";
 import { clsx } from "clsx";
 import { AvatarImage } from "./AvatarImage";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -23,10 +24,15 @@ export function Shell({ currentUser, view, onViewChange, muted, onToggleMuted, c
   const { t } = useTranslation(["common", "shell"]);
   const { logout } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
+  const { config: betConfig } = useBetConfig(Boolean(currentUser));
   const items: NavItem[] = [
     { view: "dashboard", label: t("shell:nav.dashboard"), icon: LayoutDashboard },
     { view: "poopcoins", label: t("shell:nav.poopcoins"), icon: Coins },
     { view: "cuiter", label: t("shell:nav.cuiter"), icon: MessageCircle },
+    // Item da Bet so aparece quando a PrivadIn Bet esta habilitada pelo admin.
+    ...(betConfig.enabled
+      ? [{ view: "bet" as AppView, label: t("shell:nav.bet", { defaultValue: "Bet" }), icon: Dices }]
+      : []),
     { view: "history", label: t("shell:nav.history"), icon: History },
     { view: "stats", label: t("shell:nav.stats"), icon: BarChart3, mobile: false },
     { view: "profile", label: t("shell:nav.profile"), icon: User },

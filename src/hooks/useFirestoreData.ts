@@ -1,16 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
-import { onSnapshot } from "@firebase/firestore";
+import { collection, limit, onSnapshot, orderBy, query } from "@firebase/firestore";
 import type {
   AdminAuditLog,
   AppSettings,
   AppUser,
+  BetRound,
+  BetStats,
   PoopLog,
   PoopcoinSupplySummary,
   PoopcoinTransaction,
+  PrivadInBetConfig,
   RankedUser,
   RegistrationAttempt,
   RegistrationRequest,
 } from "../types";
+import { db } from "../services/firebase";
+import { withoutSystemUsers } from "../utils/betSystem";
+import {
+  DEFAULT_BET_CONFIG,
+  betConfigDocRef,
+  betStatsDocRef,
+  houseWalletDocRef,
+  parseBetConfig,
+} from "../services/betConfigService";
 import {
   adminAuditLogsQuery,
   allLogsQuery,
@@ -58,7 +70,8 @@ export function useUsers(enabled = true) {
     const unsubscribeUsers = onSnapshot(
       usersQuery(),
       (snapshot) => {
-        setUsers(snapshot.docs.map((doc) => doc.data() as AppUser));
+        // Esconde carteiras-sistema (ex.: a banca da PrivadIn Bet) de toda a UI.
+        setUsers(withoutSystemUsers(snapshot.docs.map((doc) => doc.data() as AppUser)));
         setLoading(false);
       },
       (error) => {
@@ -290,4 +303,127 @@ export function usePoopcoinSupply(enabled = true) {
   }, [enabled]);
 
   return supply;
+}
+
+export function useBetConfig(enabled = true) {
+  const [config, setConfig] = useState<PrivadInBetConfig>(DEFAULT_BET_CONFIG);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!enabled || !isFirebaseConfigured) {
+      setConfig(DEFAULT_BET_CONFIG);
+      setLoading(false);
+      return;
+    }
+
+    return onSnapshot(
+      betConfigDocRef,
+      (snapshot) => {
+        setConfig(parseBetConfig(snapshot.data() as Partial<PrivadInBetConfig> | undefined));
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Erro ao ler configuracao da PrivadIn Bet:", error);
+        setConfig(DEFAULT_BET_CONFIG);
+        setLoading(false);
+      },
+    );
+  }, [enabled]);
+
+  return { config, loading };
+}
+
+export function useBetHistory(uid?: string, enabled = true) {
+  const [rounds, setRounds] = useState<BetRound[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!enabled || !uid || !isFirebaseConfigured) {
+      setRounds([]);
+      setLoading(false);
+      return;
+    }
+
+    const roundsQuery = query(
+      collection(db, "user_private", uid, "bet_rounds"),
+      orderBy("createdAt", "desc"),
+      limit(100),
+    );
+
+    return onSnapshot(
+      roundsQuery,
+      (snapshot) => {
+        setRounds(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as BetRound));
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Erro ao ler historico de apostas:", error);
+        setLoading(false);
+      },
+    );
+  }, [enabled, uid]);
+
+  return { rounds, loading };
+}
+
+/** Saldo da carteira-sistema da banca (apenas para o painel do Admin). */
+export function useHouseWallet(enabled = true) {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [exists, setExists] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !isFirebaseConfigured) {
+      setBalance(null);
+      setExists(false);
+      return;
+    }
+
+    return onSnapshot(
+      houseWalletDocRef,
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          setBalance(null);
+          setExists(false);
+          return;
+        }
+        setExists(true);
+        setBalance(Number((snapshot.data() as AppUser).poopcoinBalance ?? 0));
+      },
+      (error) => {
+        console.error("Erro ao ler a banca da PrivadIn Bet:", error);
+      },
+    );
+  }, [enabled]);
+
+  return { balance, exists };
+}
+
+/** Metricas agregadas e anonimas da PrivadIn Bet (privadin_bet/stats). */
+export function useBetStats(enabled = true) {
+  const [stats, setStats] = useState<BetStats>({ totalWagered: 0, totalPaidOut: 0, houseProfit: 0 });
+
+  useEffect(() => {
+    if (!enabled || !isFirebaseConfigured) {
+      setStats({ totalWagered: 0, totalPaidOut: 0, houseProfit: 0 });
+      return;
+    }
+
+    return onSnapshot(
+      betStatsDocRef,
+      (snapshot) => {
+        const data = snapshot.data() as Partial<BetStats> | undefined;
+        setStats({
+          totalWagered: Number(data?.totalWagered ?? 0),
+          totalPaidOut: Number(data?.totalPaidOut ?? 0),
+          houseProfit: Number(data?.houseProfit ?? 0),
+          updatedAt: data?.updatedAt,
+        });
+      },
+      (error) => {
+        console.error("Erro ao ler metricas da PrivadIn Bet:", error);
+      },
+    );
+  }, [enabled]);
+
+  return stats;
 }
